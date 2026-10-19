@@ -403,6 +403,38 @@ describe("entries and the older weight", () => {
   });
 });
 
+describe("malformed responses", () => {
+  const page = (extra: Record<string, unknown>) =>
+    json({
+      drawing: { ...drawingRef("d1"), status: "open" },
+      next: null,
+      ...extra,
+    });
+
+  it("refuses a page with no totals rather than report zeros", async () => {
+    const { fetch } = scripted(page({ entrants: [] }));
+    await expect(client(fetch).entries.list()).rejects.toMatchObject({
+      code: "invalid_response",
+    });
+  });
+
+  it("refuses a page with no list rather than report it empty", async () => {
+    const { fetch } = scripted(page({ entrantCount: 0, totalEntries: 0 }));
+    await expect(client(fetch).entries.list()).rejects.toMatchObject({
+      code: "invalid_response",
+    });
+  });
+
+  it("refuses totals whose two names disagree", async () => {
+    const { fetch } = scripted(
+      page({ entrantCount: 10, count: 9, totalEntries: 10, entrants: [] })
+    );
+    await expect(client(fetch).entries.list()).rejects.toMatchObject({
+      code: "invalid_response",
+    });
+  });
+});
+
 describe("drawings.run", () => {
   it("posts to run and never retries", async () => {
     const { fetch, calls } = scripted(json({ error: "draw_failed" }, 500));
@@ -413,6 +445,13 @@ describe("drawings.run", () => {
     expect(calls.map(c => `${c.method} ${c.url.pathname}`)).toEqual([
       "POST /api/v1/campaigns/demo/drawings/d1/run",
     ]);
+  });
+
+  it("waits out the route's 90 seconds, not the default 30", async () => {
+    const timeout = vi.spyOn(AbortSignal, "timeout");
+    const { fetch } = scripted(json({ drawing: { id: "d1", status: "paid" } }));
+    await client(fetch).drawings.run("d1");
+    expect(timeout).toHaveBeenCalledWith(90_000);
   });
 });
 

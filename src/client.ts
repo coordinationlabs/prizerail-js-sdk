@@ -78,10 +78,46 @@ function toWire(entrant: Entrant): Entrant {
   return { ...rest, entries: weight };
 }
 
+/** Totals as the server may send them: current names, older names, or both. */
+type WireTotals = {
+  entrantCount?: unknown;
+  totalEntries?: unknown;
+  count?: unknown;
+  totalWeight?: unknown;
+};
+
+/** An entrant row as the server may send it. */
+type WireEntrant = Omit<SentEntrant, "entries" | "weight"> & {
+  entries?: number;
+  weight?: number;
+};
+
+const badResponse = (detail: string) =>
+  new PrizerailError(0, "invalid_response", detail);
+
+const isCount = (v: unknown): v is number =>
+  typeof v === "number" && Number.isSafeInteger(v) && v >= 0;
+
+/** One of a pair of names for the same total, which must agree if both came. */
+function pick(r: WireTotals, current: keyof WireTotals, old: keyof WireTotals) {
+  const a = r[current];
+  const b = r[old];
+  if (a !== undefined && b !== undefined && a !== b) {
+    throw badResponse(
+      `${String(current)} ${a} and ${String(old)} ${b} disagree.`
+    );
+  }
+  const value = a ?? b;
+  if (!isCount(value)) {
+    throw badResponse(`The response has no valid ${String(current)}.`);
+  }
+  return value;
+}
+
 /** Both names for the totals, from whichever the server sent. */
-function totals(r: Partial<SendEntriesResponse>) {
-  const entrantCount = r.entrantCount ?? r.count ?? 0;
-  const totalEntries = r.totalEntries ?? r.totalWeight ?? 0;
+function totals(r: WireTotals) {
+  const entrantCount = pick(r, "entrantCount", "count");
+  const totalEntries = pick(r, "totalEntries", "totalWeight");
   return {
     entrantCount,
     totalEntries,
@@ -91,13 +127,34 @@ function totals(r: Partial<SendEntriesResponse>) {
 }
 
 /** A page with the current names filled in, from either server shape. */
-function normalizePage(page: EntriesPage): EntriesPage {
-  const entrants = (page.entrants ?? page.entries ?? []).map(e => ({
-    ...e,
-    entries: e.entries ?? e.weight,
-    weight: e.weight ?? e.entries,
-  }));
-  return { ...page, ...totals(page), entrants, entries: entrants };
+function normalizePage(
+  page: WireTotals & {
+    drawing: EntriesPage["drawing"];
+    entrants?: WireEntrant[];
+    entries?: WireEntrant[];
+    next: string | null;
+  }
+): EntriesPage {
+  const rows = page.entrants ?? page.entries;
+  if (!Array.isArray(rows)) {
+    throw badResponse("The response has no entrants list.");
+  }
+  const entrants = rows.map(e => {
+    const n = e.entries ?? e.weight;
+    if (!isCount(n) || n < 1 || typeof e.entrantId !== "string") {
+      throw badResponse(
+        "An entrant in the response has no valid id or entries."
+      );
+    }
+    return { ...e, entries: n, weight: n };
+  });
+  return {
+    drawing: page.drawing,
+    ...totals(page),
+    entrants,
+    entries: entrants,
+    next: page.next,
+  };
 }
 
 export class Prizerail {
@@ -282,7 +339,7 @@ export class EntriesClient {
     query: { drawing?: string; limit?: number; after?: string } = {}
   ): Promise<EntriesPage> {
     return normalizePage(
-      await this.campaign.http.request<EntriesPage>(
+      await this.campaign.http.request<Parameters<typeof normalizePage>[0]>(
         "GET",
         this.campaign.path("/entries"),
         { query }
@@ -401,8 +458,9 @@ export class DrawingsClient {
       await this.campaign.http.request<{ drawing: Drawing }>(
         "POST",
         this.campaign.path(`/drawings/${encodeURIComponent(id)}/run`),
-        // A repeat after a lost answer would only be refused, so never retry.
-        { maxRetries: 0 }
+        // A repeat after a lost answer would only be refused, so never retry,
+        // and wait out the route's own 90 seconds rather than the default 30.
+        { maxRetries: 0, timeoutMs: 90_000 }
       )
     ).drawing;
   }
