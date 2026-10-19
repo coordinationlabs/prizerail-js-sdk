@@ -1,0 +1,39 @@
+{
+  "name": "prizerail",
+  "version": "0.1.0",
+  "description": "The Prizerail SDK: send entries, read draws and verify them.",
+  "license": "MIT",
+  "homepage": "https://docs.prizerail.com",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "prizerail": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "prepublishOnly": "node scripts/build.mjs"
+  },
+  "keywords": [
+    "prizerail",
+    "sweepstakes",
+    "prize draw",
+    "pyth",
+    "verifiable"
+  ]
+}

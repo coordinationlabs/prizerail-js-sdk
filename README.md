@@ -1,0 +1,130 @@
+# prizerail
+
+The Prizerail SDK for JavaScript and TypeScript. Send entries, read results and prizes, and verify any draw from its public proof.
+
+- Typed client for the [partner API](https://docs.prizerail.com/api/authentication), with paging and safe retries.
+- `verifyDraw`, the same checks as the public verify script, plus `wasEntered` to find someone in a locked list.
+- `npx prizerail verify` from the command line.
+- No dependencies. Node 20 or later, Deno, Bun, and edge runtimes with `fetch` and WebCrypto.
+
+```sh
+npm install prizerail
+```
+
+The API is early (v0.x), so names can change between minor versions. Each change is in the [changelog](https://docs.prizerail.com/changelog).
+
+## Send entries
+
+```ts
+import { Prizerail, hashEntrant } from "prizerail"
+
+const prizerail = new Prizerail({ apiKey: process.env.PRIZERAIL_API_KEY })
+const campaign = prizerail.campaign("your-campaign")
+
+const entries = await Promise.all(
+  users.map(async user => ({
+    entrantId: await hashEntrant(user.id, process.env.ENTRANT_ID_KEY!),
+    weight: user.tickets,
+  }))
+)
+
+const result = await campaign.entries.send(entries)
+// { drawing: { id, drawAt, cutoffAt }, sent, added, updated, unchanged, count, totalWeight, batches }
+```
+
+`count` and `totalWeight` are the drawing's own totals, so reconcile with those. `added`, `updated` and `unchanged` add up what each batch reported, and a batch that was stored before its response was lost comes back as `unchanged` on the retry.
+
+`send` takes any number of entries and sends them in requests of 1,000. It retries a `429`, a `5xx`, a timeout or a network error with a jittered, growing wait, and honors `Retry-After`.
+
+Sending an entrant again before the cutoff only sets their weight, so a retry is safe until then. After the cutoff a retry would go to the next drawing, so every send is pinned to one drawing:
+
+- Before the first batch it reads which drawing is taking entries, or uses the `drawing` you pass.
+- It sends no batch and starts no retry within the request timeout (30 seconds) of that drawing's cutoff. It throws `PrizerailCutoffError` instead.
+- If a batch still lands in another drawing, it throws `PrizerailDrawingChangedError`.
+
+Both errors carry `progress`, which says how many entries the drawing confirmed. Check what it has with `entries.list({ drawing })` before you send the rest.
+
+```ts
+import { PrizerailCutoffError } from "prizerail"
+
+try {
+  await campaign.entries.send(entries)
+} catch (error) {
+  if (!(error instanceof PrizerailCutoffError)) throw error
+  console.log(`${error.progress.sent} sent to ${error.progress.drawing.id}`)
+}
+```
+
+### Entrant ids
+
+Every locked list is published, hashed. Use an id that can't be guessed or linked back to a person. `hashEntrant(userId, key)` gives the HMAC-SHA256 of the user id as hex, the same as Node's `createHmac("sha256", key).update(id).digest("hex")`. Keep the key secret, and fixed for the life of the campaign. See [Entrant ids](https://docs.prizerail.com/getting-started/concepts#make-entrant-ids-with-an-hmac).
+
+### Check what Prizerail has
+
+```ts
+let count = 0
+for await (const entry of campaign.entries.all()) count++
+```
+
+`entries.all()` pages through the drawing taking entries now, pinned to it after the first page. Pass `{ drawing: id }` for another drawing.
+
+## Results and prizes
+
+```ts
+const info = await campaign.get()
+// schedule, prizeTable.tiers with odds, guarantee, nextDrawing, termsUrl
+
+const latest = await campaign.drawings.latest()
+// the newest settled or paid drawing, with winners and payouts
+
+for await (const drawing of campaign.drawings.all({ status: "paid" })) {
+  console.log(drawing.number, drawing.winners)
+}
+
+const guarantees = await campaign.guarantees.list()
+```
+
+## Errors
+
+Every API error is a `PrizerailError` with the HTTP `status`, the API's `code` (like `not_found` or `no_open_drawing`) and a `detail`. A request that never got a response has status 0 and code `network_error`. See [Errors](https://docs.prizerail.com/api/errors).
+
+## Verify a draw
+
+Anyone can check a draw from its public proof, with no API key.
+
+```ts
+import { verifyDraw, wasEntered } from "prizerail"
+
+const result = await verifyDraw(
+  "https://www.prizerail.com/campaigns/your-campaign/draws/DRAWING_ID/proof.json"
+)
+result.ok // true when every check passes
+result.checks // [{ ok, label, detail }]
+
+wasEntered(entrantId, result.entrants!) // { index, weight } or null
+```
+
+With a client, `campaign.drawings.verify(id)` does the same. The checks are the public [verify script](https://docs.prizerail.com/verification/verify-a-draw), shipped unchanged: the entrant list's Merkle root, the random value, and each winner and prize.
+
+From the command line:
+
+```sh
+npx prizerail verify https://www.prizerail.com/campaigns/your-campaign/draws/DRAWING_ID/proof.json
+npx prizerail verify your-campaign DRAWING_ID
+```
+
+It exits 0 when every check passes, 1 when one fails, and 2 when the proof can't be read.
+
+## Options
+
+```ts
+new Prizerail({
+  apiKey: "pr_…",
+  siteUrl: "https://www.prizerail.com", // the default
+  timeoutMs: 30_000, // per attempt
+  maxRetries: 4,
+  fetch, // your own fetch, if you need one
+})
+```
+
+Keep the API key on your server. It can send entries for every campaign under your account.
