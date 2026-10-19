@@ -129,12 +129,14 @@ export type DrawingsPage = {
   nextAfter: string | null;
 };
 
-/** An entrant id, or an id with a weight and how they show if they win. */
-export type Entry =
+/** An entrant id, with one entry, or an id with their entries and how they show if they win. */
+export type Entrant =
   | string
   | {
       entrantId: string;
-      /** Whole number from 1. Leave it out and it's 1. */
+      /** Their number of entries, a whole number from 1. Leave it out and it's 1. */
+      entries?: number;
+      /** @deprecated Use `entries`. Still sent as `entries`. */
       weight?: number;
       /** Up to 40 characters. */
       displayName?: string;
@@ -142,18 +144,30 @@ export type Entry =
       avatarUrl?: string;
     };
 
+/** @deprecated Use `Entrant`. */
+export type Entry = Entrant;
+
 export type SendEntriesResponse = {
   drawing: DrawingRef;
+  /** Entrants in this request that were new, changed or the same. */
   added: number;
   updated: number;
   unchanged: number;
-  /** The drawing's totals so far. */
+  /** The drawing's entrants so far. */
+  entrantCount: number;
+  /** The drawing's total entries so far. */
+  totalEntries: number;
+  /** @deprecated Use `entrantCount`. */
   count: number;
+  /** @deprecated Use `totalEntries`. */
   totalWeight: number;
 };
 
-export type SentEntry = {
+export type SentEntrant = {
   entrantId: string;
+  /** Their number of entries. */
+  entries: number;
+  /** @deprecated Use `entries`. */
   weight: number;
   displayName: string | null;
   avatarUrl: string | null;
@@ -162,11 +176,21 @@ export type SentEntry = {
   receivedAt: string;
 };
 
+/** @deprecated Use `SentEntrant`. */
+export type SentEntry = SentEntrant;
+
 export type EntriesPage = {
   drawing: DrawingRef & { status: DrawingStatus };
+  entrantCount: number;
+  totalEntries: number;
+  /** In arrival order, the order the list locks in. */
+  entrants: SentEntrant[];
+  /** @deprecated Use `entrantCount`. */
   count: number;
+  /** @deprecated Use `totalEntries`. */
   totalWeight: number;
-  entries: SentEntry[];
+  /** @deprecated Use `entrants`, the same list. */
+  entries: SentEntrant[];
   /** Pass as `after` for the next page. Null on the last. */
   next: string | null;
 };

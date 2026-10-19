@@ -20,6 +20,8 @@ export type RequestOptions = {
    */
   deadline?: number;
   onDeadline?: (error: unknown) => Error;
+  /** For a request that isn't safe to repeat. Defaults to the client's maxRetries. */
+  maxRetries?: number;
 };
 
 const BASE_DELAY_MS = 1000;
@@ -106,9 +108,10 @@ export class Http {
   async request<T>(
     method: "GET" | "POST",
     path: string,
-    { query, body, deadline, onDeadline }: RequestOptions = {}
+    { query, body, deadline, onDeadline, ...rest }: RequestOptions = {}
   ): Promise<T> {
-    const { apiKey, fetch, timeoutMs, maxRetries, userAgent } = this.options;
+    const { apiKey, fetch, timeoutMs, userAgent } = this.options;
+    const maxRetries = rest.maxRetries ?? this.options.maxRetries;
     if (!apiKey) {
       throw new PrizerailError(
         0,

@@ -249,7 +249,7 @@ describe("entries.send", () => {
     expect(calls[0].url.searchParams.get("limit")).toBe("1");
     const sizes = calls
       .slice(1)
-      .map(c => (c.body as { entries: unknown[] }).entries.length);
+      .map(c => (c.body as { entrants: unknown[] }).entrants.length);
     expect(sizes).toEqual([1000, 1000, 500]);
   });
 
@@ -332,6 +332,87 @@ describe("entries.send", () => {
     const result = await client(fetch).entries.send(["a"]);
     expect(result.added).toBe(1);
     expect(calls.map(c => c.method)).toEqual(["GET", "POST", "POST"]);
+  });
+});
+
+describe("entries and the older weight", () => {
+  it("sends entries, and maps a deprecated weight to entries", async () => {
+    const { fetch, calls } = scripted(accepted("d1", 3, 3));
+    await client(fetch).entries.send(
+      ["a", { entrantId: "b", entries: 5 }, { entrantId: "c", weight: 2 }],
+      { drawing: drawingRef("d1") }
+    );
+    expect(calls[0].body).toEqual({
+      entrants: [
+        "a",
+        { entrantId: "b", entries: 5 },
+        { entrantId: "c", entries: 2 },
+      ],
+    });
+  });
+
+  it("refuses an entrant with both entries and weight", async () => {
+    const { fetch, calls } = scripted();
+    await expect(
+      client(fetch).entries.send([{ entrantId: "x", entries: 1, weight: 1 }], {
+        drawing: drawingRef("d1"),
+      })
+    ).rejects.toThrow("both entries and weight");
+    expect(calls).toHaveLength(0);
+  });
+
+  it("gives both names for totals, whichever the server sent", async () => {
+    const { fetch } = scripted(
+      json({
+        drawing: drawingRef("d1"),
+        added: 1,
+        updated: 0,
+        unchanged: 0,
+        entrantCount: 7,
+        totalEntries: 70,
+      })
+    );
+    const r = await client(fetch).entries.send(["a"], {
+      drawing: drawingRef("d1"),
+    });
+    expect(r).toMatchObject({
+      entrantCount: 7,
+      totalEntries: 70,
+      count: 7,
+      totalWeight: 70,
+    });
+  });
+
+  it("reads a page from an older server", async () => {
+    const { fetch } = scripted(
+      json({
+        drawing: { ...drawingRef("d1"), status: "open" },
+        count: 1,
+        totalWeight: 4,
+        entries: [{ entrantId: "a", weight: 4 }],
+        next: null,
+      })
+    );
+    const page = await client(fetch).entries.list();
+    expect(page).toMatchObject({ entrantCount: 1, totalEntries: 4 });
+    expect(page.entrants[0]).toMatchObject({
+      entrantId: "a",
+      entries: 4,
+      weight: 4,
+    });
+  });
+});
+
+describe("drawings.run", () => {
+  it("posts to run and never retries", async () => {
+    const { fetch, calls } = scripted(json({ error: "draw_failed" }, 500));
+    await expect(client(fetch).drawings.run("d1")).rejects.toMatchObject({
+      status: 500,
+      code: "draw_failed",
+    });
+    expect(calls.map(c => `${c.method} ${c.url.pathname}`)).toEqual([
+      "POST /api/v1/campaigns/demo/drawings/d1/run",
+    ]);
   });
 });
 

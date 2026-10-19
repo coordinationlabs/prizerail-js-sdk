@@ -11,15 +11,15 @@ import type {
   DrawingRef,
   DrawingStatus,
   DrawingsPage,
+  Entrant,
   EntriesPage,
-  Entry,
   Guarantee,
   SendEntriesResponse,
-  SentEntry,
+  SentEntrant,
 } from "./types.js";
 import { type DrawProof, type VerifyResult, verifyDraw } from "./verify.js";
 
-export const VERSION = "0.1.0";
+export const VERSION = "0.2.0";
 
 const badPage = (detail: string) =>
   new PrizerailError(0, "invalid_response", `Paging stopped: ${detail}.`);
@@ -54,16 +54,51 @@ export type SendOptions = {
 };
 
 /**
- * `count` and `totalWeight` are the drawing's totals after the last batch.
- * `added`, `updated` and `unchanged` sum what each batch reported, so a
- * batch stored before its response was lost, then retried, counts as
- * unchanged. Reconcile with `count`, not with `added`.
+ * `entrantCount` and `totalEntries` are the drawing's totals after the last
+ * batch. `added`, `updated` and `unchanged` sum what each batch reported, so
+ * a batch stored before its response was lost, then retried, counts as
+ * unchanged. Reconcile with `entrantCount`, not with `added`.
  */
 export type SendResult = SendEntriesResponse & {
-  /** Entries in the batches the drawing confirmed. */
+  /** Entrants in the batches the drawing confirmed. */
   sent: number;
   batches: number;
 };
+
+/** An entrant as the API takes it: `entries`, never the older `weight`. */
+function toWire(entrant: Entrant): Entrant {
+  if (typeof entrant === "string") return entrant;
+  const { weight, ...rest } = entrant;
+  if (weight === undefined) return rest;
+  if (rest.entries !== undefined) {
+    throw new TypeError(
+      `Entrant ${rest.entrantId} has both entries and weight. Send entries.`
+    );
+  }
+  return { ...rest, entries: weight };
+}
+
+/** Both names for the totals, from whichever the server sent. */
+function totals(r: Partial<SendEntriesResponse>) {
+  const entrantCount = r.entrantCount ?? r.count ?? 0;
+  const totalEntries = r.totalEntries ?? r.totalWeight ?? 0;
+  return {
+    entrantCount,
+    totalEntries,
+    count: entrantCount,
+    totalWeight: totalEntries,
+  };
+}
+
+/** A page with the current names filled in, from either server shape. */
+function normalizePage(page: EntriesPage): EntriesPage {
+  const entrants = (page.entrants ?? page.entries ?? []).map(e => ({
+    ...e,
+    entries: e.entries ?? e.weight,
+    weight: e.weight ?? e.entries,
+  }));
+  return { ...page, ...totals(page), entrants, entries: entrants };
+}
 
 export class Prizerail {
   readonly siteUrl: string;
@@ -159,7 +194,11 @@ export class EntriesClient {
    * a PrizerailCutoffError rather than send or retry near its cutoff, and
    * with a PrizerailDrawingChangedError if a batch lands anywhere else.
    */
-  async send(entries: Entry[], options: SendOptions = {}): Promise<SendResult> {
+  async send(
+    entrants: Entrant[],
+    options: SendOptions = {}
+  ): Promise<SendResult> {
+    const entries = entrants.map(toWire);
     if (entries.length === 0) throw new Error("send() needs entries.");
     const margin =
       options.cutoffMarginMs ?? this.campaign.http.options.timeoutMs;
@@ -197,7 +236,7 @@ export class EntriesClient {
         "POST",
         this.campaign.path("/entries"),
         {
-          body: { entries: batch },
+          body: { entrants: batch },
           deadline: cutoff - margin,
           onDeadline: cause =>
             stop(
@@ -222,8 +261,7 @@ export class EntriesClient {
       added: progress.added,
       updated: progress.updated,
       unchanged: progress.unchanged,
-      count: final.count,
-      totalWeight: final.totalWeight,
+      ...totals(final),
       sent: progress.sent,
       batches,
     };
@@ -240,24 +278,26 @@ export class EntriesClient {
   }
 
   /** One page of a drawing's entries, in arrival order. */
-  list(
+  async list(
     query: { drawing?: string; limit?: number; after?: string } = {}
   ): Promise<EntriesPage> {
-    return this.campaign.http.request<EntriesPage>(
-      "GET",
-      this.campaign.path("/entries"),
-      { query }
+    return normalizePage(
+      await this.campaign.http.request<EntriesPage>(
+        "GET",
+        this.campaign.path("/entries"),
+        { query }
+      )
     );
   }
 
   /**
-   * Every entry in a drawing, page by page. Without `drawing`, the one
+   * Every entrant in a drawing, page by page. Without `drawing`, the one
    * taking entries now, pinned by id after the first page so a cutoff
    * mid-read can't mix in the next drawing.
    */
   async *all(
     query: { drawing?: string; pageSize?: number } = {}
-  ): AsyncGenerator<SentEntry> {
+  ): AsyncGenerator<SentEntrant> {
     let drawing = query.drawing;
     let after: string | undefined;
     for (;;) {
@@ -272,7 +312,7 @@ export class EntriesClient {
           `a page came from drawing ${page.drawing.id}, not ${drawing}`
         );
       }
-      yield* page.entries;
+      yield* page.entrants;
       if (page.next === null) return;
       // Each cursor must move forward, or a bad page would loop forever.
       // Cursors are whole numbers sent as strings, so compare them as numbers.
@@ -345,6 +385,24 @@ export class DrawingsClient {
       await this.campaign.http.request<{ drawing: Drawing }>(
         "GET",
         this.campaign.path(`/drawings/${encodeURIComponent(id)}`)
+      )
+    ).drawing;
+  }
+
+  /**
+   * Test environment only: closes the drawing's entries now and draws it,
+   * instead of waiting for its cutoff. Resolves with the drawing, settled or
+   * paid, or still `entropy_requested` if the random value is on its way, in
+   * which case read it again with `get(id)`. Elsewhere it throws a
+   * PrizerailError with code `test_only`.
+   */
+  async run(id: string): Promise<Drawing> {
+    return (
+      await this.campaign.http.request<{ drawing: Drawing }>(
+        "POST",
+        this.campaign.path(`/drawings/${encodeURIComponent(id)}/run`),
+        // A repeat after a lost answer would only be refused, so never retry.
+        { maxRetries: 0 }
       )
     ).drawing;
   }

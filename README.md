@@ -11,7 +11,7 @@ The Prizerail SDK for JavaScript and TypeScript. Send entries, read results and 
 npm install prizerail
 ```
 
-The API is early (v0.x), so names can change between minor versions. Each change is in the [changelog](https://docs.prizerail.com/changelog).
+The API is early (v0.x), so names can change between minor versions. 0.2.0 says `entries` where 0.1.0 said `weight`: an entrant is `{ entrantId, entries }`, and totals are `entrantCount` and `totalEntries`. The old names still work, marked deprecated. Each change is in the [changelog](https://docs.prizerail.com/changelog).
 
 ## Send entries
 
@@ -24,19 +24,19 @@ const campaign = prizerail.campaign("your-campaign")
 const entries = await Promise.all(
   users.map(async user => ({
     entrantId: await hashEntrant(user.id, process.env.ENTRANT_ID_KEY!),
-    weight: user.tickets,
+    entries: user.tickets,
   }))
 )
 
 const result = await campaign.entries.send(entries)
-// { drawing: { id, drawAt, cutoffAt }, sent, added, updated, unchanged, count, totalWeight, batches }
+// { drawing: { id, drawAt, cutoffAt }, sent, added, updated, unchanged, entrantCount, totalEntries, batches }
 ```
 
-`count` and `totalWeight` are the drawing's own totals, so reconcile with those. `added`, `updated` and `unchanged` add up what each batch reported, and a batch that was stored before its response was lost comes back as `unchanged` on the retry.
+`entrantCount` and `totalEntries` are the drawing's own totals, so reconcile with those. `added`, `updated` and `unchanged` add up what each batch reported, and a batch that was stored before its response was lost comes back as `unchanged` on the retry.
 
 `send` takes any number of entries and sends them in requests of 1,000. It retries a `429`, a `5xx`, a timeout or a network error with a jittered, growing wait, and honors `Retry-After`.
 
-Sending an entrant again before the cutoff only sets their weight, so a retry is safe until then. After the cutoff a retry would go to the next drawing, so every send is pinned to one drawing:
+Sending an entrant again before the cutoff only sets their entries, so a retry is safe until then. After the cutoff a retry would go to the next drawing, so every send is pinned to one drawing:
 
 - Before the first batch it reads which drawing is taking entries, or uses the `drawing` you pass.
 - It sends no batch and starts no retry within the request timeout (30 seconds) of that drawing's cutoff. It throws `PrizerailCutoffError` instead.
@@ -62,8 +62,8 @@ Every locked list is published, hashed. Use an id that can't be guessed or linke
 ### Check what Prizerail has
 
 ```ts
-let count = 0
-for await (const entry of campaign.entries.all()) count++
+let total = 0
+for await (const entrant of campaign.entries.all()) total += entrant.entries
 ```
 
 `entries.all()` pages through the drawing taking entries now, pinned to it after the first page. Pass `{ drawing: id }` for another drawing.
@@ -84,6 +84,10 @@ for await (const drawing of campaign.drawings.all({ status: "paid" })) {
 const guarantees = await campaign.guarantees.list()
 ```
 
+## Draw now, in test
+
+In the test environment, `campaign.drawings.run(id)` closes a drawing's entries now and draws it, so you can see a whole draw without waiting for its cutoff. It resolves with the drawing, usually settled within seconds. Anywhere else it throws a `PrizerailError` with code `test_only`. See [Draw now](https://docs.prizerail.com/api/drawings#draw-now-test-only).
+
 ## Errors
 
 Every API error is a `PrizerailError` with the HTTP `status`, the API's `code` (like `not_found` or `no_open_drawing`) and a `detail`. A request that never got a response has status 0 and code `network_error`. See [Errors](https://docs.prizerail.com/api/errors).
@@ -101,7 +105,7 @@ const result = await verifyDraw(
 result.ok // true when every check passes
 result.checks // [{ ok, label, detail }]
 
-wasEntered(entrantId, result.entrants!) // { index, weight } or null
+wasEntered(entrantId, result.entrants!) // { index, entries } or null
 ```
 
 With a client, `campaign.drawings.verify(id)` does the same. The checks are the public [verify script](https://docs.prizerail.com/verification/verify-a-draw), shipped unchanged: the entrant list's Merkle root, the random value, and each winner and prize.

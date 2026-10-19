@@ -132,8 +132,9 @@ export async function verifyDraw(
 export function wasEntered(
   entrantId: string,
   rows: EntrantRow[]
-): { index: number; weight: number } | null {
+): { index: number; entries: number; weight: number } | null {
   const hash = winnerHash(entrantId);
   const row = rows.find(r => r[1].toLowerCase() === hash);
-  return row ? { index: row[0], weight: row[2] } : null;
+  // The proof calls an entrant's entries their weight. Both names, for now.
+  return row ? { index: row[0], entries: row[2], weight: row[2] } : null;
 }

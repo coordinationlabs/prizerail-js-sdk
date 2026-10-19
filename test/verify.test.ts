@@ -39,7 +39,11 @@ describe("wasEntered", () => {
       [0, winnerHash("alice"), 1],
       [1, winnerHash("bob").toUpperCase().replace("0X", "0x"), 3],
     ];
-    expect(wasEntered("bob", rows)).toEqual({ index: 1, weight: 3 });
+    expect(wasEntered("bob", rows)).toEqual({
+      index: 1,
+      entries: 3,
+      weight: 3,
+    });
     expect(wasEntered("carol", rows)).toBeNull();
   });
 });
