@@ -20,7 +20,7 @@ import type {
 } from "./types.js";
 import { type DrawProof, type VerifyResult, verifyDraw } from "./verify.js";
 
-export const VERSION = "0.3.3";
+export const VERSION = "0.4.0";
 
 const badPage = (detail: string) =>
   new PrizerailError(0, "invalid_response", `Paging stopped: ${detail}.`);
@@ -31,7 +31,11 @@ export const ENTRIES_PER_REQUEST = 1000;
 export type PrizerailOptions = {
   /** Your `pr_…` key. Only the public helpers work without one. */
   apiKey?: string;
-  /** Defaults to https://www.prizerail.com. */
+  /**
+   * Defaults to https://test.prizerail.com for a `pr_test_` key and
+   * https://www.prizerail.com otherwise. Set it to point anywhere else, such
+   * as a local server.
+   */
   siteUrl?: string;
   /** Per attempt. Defaults to 30 seconds. */
   timeoutMs?: number;
@@ -274,13 +278,20 @@ function normalizePage(
   };
 }
 
+/** The site a key belongs to: test keys only work on the test site. */
+function defaultSiteUrl(apiKey?: string): string {
+  return apiKey?.trim().startsWith("pr_test_")
+    ? "https://test.prizerail.com"
+    : "https://www.prizerail.com";
+}
+
 export class Prizerail {
   readonly siteUrl: string;
   /** @internal */
   readonly http: Http;
 
   constructor(options: PrizerailOptions = {}) {
-    this.siteUrl = (options.siteUrl ?? "https://www.prizerail.com").replace(
+    this.siteUrl = (options.siteUrl ?? defaultSiteUrl(options.apiKey)).replace(
       /\/+$/,
       ""
     );

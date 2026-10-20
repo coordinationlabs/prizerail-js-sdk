@@ -77,6 +77,43 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+describe("site", () => {
+  it("sends a pr_test_ key to the test site and others to production", () => {
+    expect(new Prizerail({ apiKey: "pr_test_abc" }).siteUrl).toBe(
+      "https://test.prizerail.com"
+    );
+    expect(new Prizerail({ apiKey: " pr_test_abc " }).siteUrl).toBe(
+      "https://test.prizerail.com"
+    );
+    expect(new Prizerail({ apiKey: "pr_prod_abc" }).siteUrl).toBe(
+      "https://www.prizerail.com"
+    );
+    expect(new Prizerail({ apiKey: "pr_dev_abc" }).siteUrl).toBe(
+      "https://www.prizerail.com"
+    );
+    expect(new Prizerail().siteUrl).toBe("https://www.prizerail.com");
+  });
+
+  it("lets an explicit siteUrl win over the key", () => {
+    expect(
+      new Prizerail({
+        apiKey: "pr_test_abc",
+        siteUrl: "http://localhost:3000/",
+      }).siteUrl
+    ).toBe("http://localhost:3000");
+  });
+
+  it("sends a pr_test_ key's requests to the test API", async () => {
+    const { fetch, calls } = scripted(json({ campaign: { slug: "demo" } }));
+    await new Prizerail({ apiKey: "pr_test_abc", fetch })
+      .campaign("demo")
+      .get();
+    expect(calls[0].url.href).toBe(
+      "https://test.prizerail.com/api/v1/campaigns/demo"
+    );
+  });
+});
+
 describe("requests", () => {
   it("sends the key and reads the campaign", async () => {
     const { fetch, calls } = scripted(json({ campaign: { slug: "demo" } }));

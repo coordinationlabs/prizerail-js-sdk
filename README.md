@@ -139,7 +139,7 @@ It exits 0 when every check passes, 1 when one fails, and 2 when the proof can't
 ```ts
 new Prizerail({
   apiKey: "pr_…",
-  siteUrl: "https://www.prizerail.com", // the default
+  siteUrl: "https://www.prizerail.com", // the default, or https://test.prizerail.com for a pr_test_ key
   timeoutMs: 30_000, // per attempt
   maxRetries: 4,
   fetch, // your own fetch, if you need one
