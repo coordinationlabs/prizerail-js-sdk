@@ -158,9 +158,9 @@ export type EntrantEvent = {
   /** Entries this event adds, a whole number from 1. Leave it out and it's 1. */
   entries?: number;
   eventId: string;
-  /** Up to 40 characters. Replaces the stored one when the event is first counted. */
+  /** Up to 40 characters. Replaces the stored one when the event is first counted. Empty keeps it. */
   displayName?: string;
-  /** https, up to 2,048 characters. Replaces the stored one when the event is first counted. */
+  /** https, up to 2,048 characters. Replaces the stored one when the event is first counted. Empty keeps it. */
   avatarUrl?: string;
 };
 

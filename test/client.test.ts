@@ -478,6 +478,15 @@ describe("entries.increment", () => {
     expect(r.drawings.map(d => d.id)).toEqual(["d1", "d2"]);
   });
 
+  it("names no drawing for a batch that was all duplicates", async () => {
+    const { fetch } = scripted(incremented("d2", 0, 1));
+    const r = await client(fetch).entries.increment([
+      { entrantId: "a", eventId: "stored-before-the-cutoff" },
+    ]);
+    expect(r).toMatchObject({ duplicates: 1, batches: 1 });
+    expect(r.drawings).toEqual([]);
+  });
+
   it("refuses an event without an eventId before sending anything", async () => {
     const { fetch, calls } = scripted();
     await expect(

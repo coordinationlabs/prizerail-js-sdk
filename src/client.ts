@@ -20,7 +20,7 @@ import type {
 } from "./types.js";
 import { type DrawProof, type VerifyResult, verifyDraw } from "./verify.js";
 
-export const VERSION = "0.3.0";
+export const VERSION = "0.3.1";
 
 const badPage = (detail: string) =>
   new PrizerailError(0, "invalid_response", `Paging stopped: ${detail}.`);
@@ -75,9 +75,9 @@ export type IncrementResult = {
   sent: number;
   batches: number;
   /**
-   * Each drawing a batch went to, in order: the one taking entries when it
-   * arrived. A duplicate stays counted in the drawing it first went to,
-   * which can be an earlier one.
+   * Each drawing these events added entries to, in order. A batch that was
+   * all duplicates adds none, since those events are in the drawing they
+   * first went to, which can be an earlier one.
    */
   drawings: DrawingRef[];
 };
@@ -445,7 +445,13 @@ export class EntriesClient {
       result.duplicates += res.duplicates ?? 0;
       result.sent += batch.length;
       result.batches++;
-      if (result.drawings.at(-1)?.id !== res.drawing.id) {
+      // Only a batch that added entries names where they went. One that was
+      // all duplicates, such as a retry after the cutoff of a batch already
+      // stored, names the next drawing, not the one the events are in.
+      if (
+        res.added + res.updated > 0 &&
+        result.drawings.at(-1)?.id !== res.drawing.id
+      ) {
         result.drawings.push(res.drawing);
       }
     }

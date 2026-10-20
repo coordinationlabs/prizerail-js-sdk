@@ -1,6 +1,6 @@
 {
   "name": "prizerail",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "The Prizerail SDK: send entries, read draws and verify them.",
   "license": "MIT",
   "homepage": "https://docs.prizerail.com",
