@@ -484,8 +484,53 @@ describe("entries.increment", () => {
       client(fetch).entries.increment([
         { entrantId: "a", eventId: " " } as never,
       ])
-    ).rejects.toThrow("no eventId");
+    ).rejects.toThrow("needs an eventId");
     expect(calls).toHaveLength(0);
+  });
+
+  it("checks every event before the first batch, so none is half sent", async () => {
+    const { fetch, calls } = scripted();
+    const events = Array.from({ length: 1001 }, (_, i) => ({
+      entrantId: `e${i}`,
+      eventId: `ev-${i}`,
+    }));
+    await expect(
+      client(fetch).entries.increment([
+        ...events,
+        { entrantId: "x", entries: 0, eventId: "ev-bad" },
+      ])
+    ).rejects.toThrow("entries must be a whole number");
+    await expect(
+      client(fetch).entries.increment([
+        ...events,
+        { entrantId: "x", eventId: "y".repeat(201) },
+      ])
+    ).rejects.toThrow("200 characters or fewer");
+    expect(calls).toHaveLength(0);
+  });
+
+  it("allows the same event twice but not one id for two events", async () => {
+    const { fetch, calls } = scripted(incremented("d1", 1, 1));
+    await client(fetch).entries.increment([
+      { entrantId: "a", entries: 2, eventId: "ev" },
+      { entrantId: "a", entries: 2, eventId: "ev" },
+    ]);
+    await expect(
+      client(fetch).entries.increment([
+        { entrantId: "a", entries: 2, eventId: "ev" },
+        { entrantId: "b", entries: 2, eventId: "ev" },
+      ])
+    ).rejects.toThrow("two different events");
+    expect(calls).toHaveLength(1);
+  });
+
+  it("refuses a response without valid counts", async () => {
+    const { fetch } = scripted(
+      json({ drawing: drawingRef("d1"), added: "1", updated: 0 })
+    );
+    await expect(
+      client(fetch).entries.increment([{ entrantId: "a", eventId: "ev" }])
+    ).rejects.toMatchObject({ code: "invalid_response" });
   });
 });
 

@@ -74,7 +74,11 @@ export type IncrementResult = {
   /** Events in the batches Prizerail confirmed. */
   sent: number;
   batches: number;
-  /** Each drawing the events went to, in order. */
+  /**
+   * Each drawing a batch went to, in order: the one taking entries when it
+   * arrived. A duplicate stays counted in the drawing it first went to,
+   * which can be an earlier one.
+   */
   drawings: DrawingRef[];
 };
 
@@ -83,6 +87,68 @@ export type SendResult = SendEntriesResponse & {
   sent: number;
   batches: number;
 };
+
+/** The API's limits on an event, as it checks them. */
+const ID_MAX = 200;
+const ENTRIES_MAX = 2 ** 32 - 1;
+
+/**
+ * Every event checked against the API's rules before the first request. The
+ * same eventId twice is fine if it's the same event, which the API ignores,
+ * but not for another entrant or count.
+ */
+function checkEvents(events: EntrantEvent[]) {
+  const seen = new Map<string, EntrantEvent>();
+  for (const [i, e] of events.entries()) {
+    const id = typeof e.entrantId === "string" ? e.entrantId.trim() : "";
+    if (id === "" || e.entrantId.length > ID_MAX) {
+      throw new TypeError(
+        `Event ${i}: entrantId must be a non-empty string of ${ID_MAX} characters or fewer.`
+      );
+    }
+    const eventId = typeof e.eventId === "string" ? e.eventId.trim() : "";
+    if (eventId === "" || e.eventId.length > ID_MAX) {
+      throw new TypeError(
+        `Event ${i} (${id}) needs an eventId of ${ID_MAX} characters or fewer: the id of the event behind these entries, the same on every retry.`
+      );
+    }
+    const entries = e.entries ?? 1;
+    if (!Number.isInteger(entries) || entries < 1 || entries > ENTRIES_MAX) {
+      throw new TypeError(
+        `Event ${i} (${eventId}): entries must be a whole number from 1 to ${ENTRIES_MAX}.`
+      );
+    }
+    const was = seen.get(eventId);
+    if (
+      was &&
+      (was.entrantId.trim() !== id || (was.entries ?? 1) !== entries)
+    ) {
+      throw new TypeError(
+        `eventId "${eventId}" is used for two different events. Give each event its own id.`
+      );
+    }
+    seen.set(eventId, e);
+  }
+}
+
+/** An increment response, checked before its counts are added up. */
+function checkIncrementResponse(r: unknown) {
+  const res = r as {
+    drawing?: { id?: unknown };
+    added?: unknown;
+    updated?: unknown;
+    duplicates?: unknown;
+  } | null;
+  if (
+    typeof res?.drawing?.id !== "string" ||
+    !isCount(res.added) ||
+    !isCount(res.updated) ||
+    !isCount(res.duplicates ?? 0)
+  ) {
+    throw badResponse("The increment response has no valid drawing or counts.");
+  }
+  return res as SendEntriesResponse & { duplicates?: number };
+}
 
 /** An entrant as the API takes it: `entries`, never the older `weight`. */
 function toWire(entrant: Entrant): Entrant {
@@ -353,13 +419,9 @@ export class EntriesClient {
    */
   async increment(events: EntrantEvent[]): Promise<IncrementResult> {
     if (events.length === 0) throw new Error("increment() needs events.");
-    for (const e of events) {
-      if (typeof e.eventId !== "string" || e.eventId.trim() === "") {
-        throw new TypeError(
-          `Entrant ${e.entrantId} has no eventId. Use the id of the event behind these entries, the same on every retry.`
-        );
-      }
-    }
+    // Checked before anything is sent, so a bad event late in the list can't
+    // leave the batches before it stored and the call failed.
+    checkEvents(events);
     const result: IncrementResult = {
       added: 0,
       updated: 0,
@@ -371,10 +433,12 @@ export class EntriesClient {
     for (let i = 0; i < events.length; i += ENTRIES_PER_REQUEST) {
       const batch = events.slice(i, i + ENTRIES_PER_REQUEST);
       // Retries are safe here at any time: a repeated eventId is ignored.
-      const res = await this.campaign.http.request<SendEntriesResponse>(
-        "POST",
-        this.campaign.path("/entries"),
-        { body: { mode: "increment", entrants: batch } }
+      const res = checkIncrementResponse(
+        await this.campaign.http.request<unknown>(
+          "POST",
+          this.campaign.path("/entries"),
+          { body: { mode: "increment", entrants: batch } }
+        )
       );
       result.added += res.added;
       result.updated += res.updated;
