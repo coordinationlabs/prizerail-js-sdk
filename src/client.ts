@@ -20,7 +20,7 @@ import type {
 } from "./types.js";
 import { type DrawProof, type VerifyResult, verifyDraw } from "./verify.js";
 
-export const VERSION = "0.3.1";
+export const VERSION = "0.3.2";
 
 const badPage = (detail: string) =>
   new PrizerailError(0, "invalid_response", `Paging stopped: ${detail}.`);
@@ -118,6 +118,20 @@ function checkEvents(events: EntrantEvent[]) {
         `Event ${i} (${eventId}): entries must be a whole number from 1 to ${ENTRIES_MAX}.`
       );
     }
+    if (e.displayName != null && typeof e.displayName !== "string") {
+      throw new TypeError(
+        `Event ${i} (${eventId}): displayName must be a string.`
+      );
+    }
+    if (
+      e.avatarUrl != null &&
+      e.avatarUrl !== "" &&
+      !isAvatarUrl(e.avatarUrl)
+    ) {
+      throw new TypeError(
+        `Event ${i} (${eventId}): avatarUrl must be an https URL of ${AVATAR_URL_MAX} characters or fewer.`
+      );
+    }
     const was = seen.get(eventId);
     if (
       was &&
@@ -128,6 +142,17 @@ function checkEvents(events: EntrantEvent[]) {
       );
     }
     seen.set(eventId, e);
+  }
+}
+
+/** The API's rule for an avatar: https, and 2,048 characters at most. */
+const AVATAR_URL_MAX = 2048;
+function isAvatarUrl(value: unknown) {
+  if (typeof value !== "string" || value.length > AVATAR_URL_MAX) return false;
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
   }
 }
 

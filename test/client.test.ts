@@ -515,6 +515,16 @@ describe("entries.increment", () => {
         { entrantId: "x", eventId: "y".repeat(201) },
       ])
     ).rejects.toThrow("200 characters or fewer");
+    await expect(
+      client(fetch).entries.increment([
+        ...events,
+        {
+          entrantId: "x",
+          eventId: "ev-x",
+          avatarUrl: "http://a.example/p.png",
+        },
+      ])
+    ).rejects.toThrow("avatarUrl must be an https URL");
     expect(calls).toHaveLength(0);
   });
 
