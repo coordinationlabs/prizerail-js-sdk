@@ -11,7 +11,7 @@ The Prizerail SDK for JavaScript and TypeScript. Send entries, read results and 
 npm install prizerail
 ```
 
-The API is early (v0.x), so names can change between minor versions. 0.3.0 adds `entries.increment()`, 0.3.1 checks every event before sending any and lists only the drawings that took entries, and 0.3.2 and 0.3.3 check avatar URLs, names and the older `weight` up front too. 0.2.0 says `entries` where 0.1.0 said `weight`: an entrant is `{ entrantId, entries }`, and totals are `entrantCount` and `totalEntries`. The old names still work, marked deprecated. Each change is in the [changelog](https://docs.prizerail.com/changelog).
+The API is early (v0.x), so names can change between minor versions. 0.4.0 sends a `pr_test_` key to https://test.prizerail.com unless you pass `siteUrl`. 0.3.0 adds `entries.increment()`, 0.3.1 checks every event before sending any and lists only the drawings that took entries, and 0.3.2 and 0.3.3 check avatar URLs, names and the older `weight` up front too. 0.2.0 says `entries` where 0.1.0 said `weight`: an entrant is `{ entrantId, entries }`, and totals are `entrantCount` and `totalEntries`. The old names still work, marked deprecated. Each change is in the [changelog](https://docs.prizerail.com/changelog).
 
 ## Send entries
 
@@ -131,6 +131,8 @@ From the command line:
 npx prizerail verify https://www.prizerail.com/campaigns/your-campaign/draws/DRAWING_ID/proof.json
 npx prizerail verify your-campaign DRAWING_ID
 ```
+
+A slug is looked up on www.prizerail.com. For a draw from a test campaign, add `--site https://test.prizerail.com`, or set `PRIZERAIL_API_KEY` to your `pr_test_` key. The same goes for the public helpers without a key: `new Prizerail({ siteUrl: "https://test.prizerail.com" })` reaches test campaigns.
 
 It exits 0 when every check passes, 1 when one fails, and 2 when the proof can't be read.
 
