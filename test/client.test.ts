@@ -435,6 +435,60 @@ describe("malformed responses", () => {
   });
 });
 
+describe("entries.increment", () => {
+  const incremented = (id: string, updated: number, duplicates: number) =>
+    json({
+      drawing: drawingRef(id),
+      added: 0,
+      updated,
+      unchanged: 0,
+      duplicates,
+      entrantCount: 5,
+      totalEntries: 50,
+    });
+
+  it("posts increment mode with each event, and sums what happened", async () => {
+    const { fetch, calls } = scripted(incremented("d1", 1, 1));
+    const r = await client(fetch).entries.increment([
+      { entrantId: "a", entries: 10, eventId: "order-1" },
+      { entrantId: "b", eventId: "order-2" },
+    ]);
+    expect(calls[0].body).toEqual({
+      mode: "increment",
+      entrants: [
+        { entrantId: "a", entries: 10, eventId: "order-1" },
+        { entrantId: "b", eventId: "order-2" },
+      ],
+    });
+    expect(r).toMatchObject({ updated: 1, duplicates: 1, sent: 2, batches: 1 });
+    expect(r.drawings.map(d => d.id)).toEqual(["d1"]);
+  });
+
+  it("records each drawing when a cutoff splits the batches", async () => {
+    const { fetch } = scripted(
+      incremented("d1", 1000, 0),
+      incremented("d2", 1, 0)
+    );
+    const events = Array.from({ length: 1001 }, (_, i) => ({
+      entrantId: `e${i}`,
+      eventId: `ev-${i}`,
+    }));
+    const r = await client(fetch).entries.increment(events);
+    expect(r.batches).toBe(2);
+    expect(r.drawings.map(d => d.id)).toEqual(["d1", "d2"]);
+  });
+
+  it("refuses an event without an eventId before sending anything", async () => {
+    const { fetch, calls } = scripted();
+    await expect(
+      client(fetch).entries.increment([
+        { entrantId: "a", eventId: " " } as never,
+      ])
+    ).rejects.toThrow("no eventId");
+    expect(calls).toHaveLength(0);
+  });
+});
+
 describe("drawings.run", () => {
   it("posts to run and never retries", async () => {
     const { fetch, calls } = scripted(json({ error: "draw_failed" }, 500));

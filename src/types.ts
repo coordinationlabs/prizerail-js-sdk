@@ -147,6 +147,23 @@ export type Entrant =
 /** @deprecated Use `Entrant`. */
 export type Entry = Entrant;
 
+/**
+ * One event that earns an entrant entries, for `entries.increment()`. The
+ * `eventId` names the event (an order id, a referral id, or a UUID made once
+ * when it happens), and must be the same on every retry or redelivery, so
+ * Prizerail can ignore repeats. Never make it per attempt.
+ */
+export type EntrantEvent = {
+  entrantId: string;
+  /** Entries this event adds, a whole number from 1. Leave it out and it's 1. */
+  entries?: number;
+  eventId: string;
+  /** Up to 40 characters. Replaces the stored one when sent. */
+  displayName?: string;
+  /** https, up to 2,048 characters. Replaces the stored one when sent. */
+  avatarUrl?: string;
+};
+
 export type SendEntriesResponse = {
   drawing: DrawingRef;
   /** Entrants in this request that were new, changed or the same. */
@@ -161,6 +178,8 @@ export type SendEntriesResponse = {
   count: number;
   /** @deprecated Use `totalEntries`. */
   totalWeight: number;
+  /** Increment mode: events this campaign had already seen, so ignored. */
+  duplicates?: number;
 };
 
 export type SentEntrant = {

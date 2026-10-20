@@ -3,6 +3,7 @@ export {
   DrawingsClient,
   ENTRIES_PER_REQUEST,
   EntriesClient,
+  type IncrementResult,
   Prizerail,
   type PrizerailOptions,
   type SendOptions,

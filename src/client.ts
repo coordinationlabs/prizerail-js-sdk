@@ -12,6 +12,7 @@ import type {
   DrawingStatus,
   DrawingsPage,
   Entrant,
+  EntrantEvent,
   EntriesPage,
   Guarantee,
   SendEntriesResponse,
@@ -19,7 +20,7 @@ import type {
 } from "./types.js";
 import { type DrawProof, type VerifyResult, verifyDraw } from "./verify.js";
 
-export const VERSION = "0.2.0";
+export const VERSION = "0.3.0";
 
 const badPage = (detail: string) =>
   new PrizerailError(0, "invalid_response", `Paging stopped: ${detail}.`);
@@ -59,6 +60,24 @@ export type SendOptions = {
  * a batch stored before its response was lost, then retried, counts as
  * unchanged. Reconcile with `entrantCount`, not with `added`.
  */
+/**
+ * What `entries.increment()` did. Its batches go to the drawing taking
+ * entries when each arrives, so a cutoff mid-way splits them between
+ * drawings, which is correct for events that happened either side of it.
+ */
+export type IncrementResult = {
+  /** Entrants new to their drawing, and entrants given more entries. */
+  added: number;
+  updated: number;
+  /** Events Prizerail had already seen in this campaign, so ignored. */
+  duplicates: number;
+  /** Events in the batches Prizerail confirmed. */
+  sent: number;
+  batches: number;
+  /** Each drawing the events went to, in order. */
+  drawings: DrawingRef[];
+};
+
 export type SendResult = SendEntriesResponse & {
   /** Entrants in the batches the drawing confirmed. */
   sent: number;
@@ -322,6 +341,51 @@ export class EntriesClient {
       sent: progress.sent,
       batches,
     };
+  }
+
+  /**
+   * Adds entries to entrants, one event at a time: `{ entrantId, entries,
+   * eventId }`. Prizerail records each `eventId` for the campaign and
+   * ignores it if it comes again, so this is safe to retry and safe for a
+   * queue that delivers an event twice, even after a cutoff. Sent in
+   * requests of 1,000, retried like `send`. An `eventId` reused for a
+   * different entrant or count throws a PrizerailError, `event_conflict`.
+   */
+  async increment(events: EntrantEvent[]): Promise<IncrementResult> {
+    if (events.length === 0) throw new Error("increment() needs events.");
+    for (const e of events) {
+      if (typeof e.eventId !== "string" || e.eventId.trim() === "") {
+        throw new TypeError(
+          `Entrant ${e.entrantId} has no eventId. Use the id of the event behind these entries, the same on every retry.`
+        );
+      }
+    }
+    const result: IncrementResult = {
+      added: 0,
+      updated: 0,
+      duplicates: 0,
+      sent: 0,
+      batches: 0,
+      drawings: [],
+    };
+    for (let i = 0; i < events.length; i += ENTRIES_PER_REQUEST) {
+      const batch = events.slice(i, i + ENTRIES_PER_REQUEST);
+      // Retries are safe here at any time: a repeated eventId is ignored.
+      const res = await this.campaign.http.request<SendEntriesResponse>(
+        "POST",
+        this.campaign.path("/entries"),
+        { body: { mode: "increment", entrants: batch } }
+      );
+      result.added += res.added;
+      result.updated += res.updated;
+      result.duplicates += res.duplicates ?? 0;
+      result.sent += batch.length;
+      result.batches++;
+      if (result.drawings.at(-1)?.id !== res.drawing.id) {
+        result.drawings.push(res.drawing);
+      }
+    }
+    return result;
   }
 
   /** The drawing taking entries now. */

@@ -11,7 +11,7 @@ The Prizerail SDK for JavaScript and TypeScript. Send entries, read results and 
 npm install prizerail
 ```
 
-The API is early (v0.x), so names can change between minor versions. 0.2.0 says `entries` where 0.1.0 said `weight`: an entrant is `{ entrantId, entries }`, and totals are `entrantCount` and `totalEntries`. The old names still work, marked deprecated. Each change is in the [changelog](https://docs.prizerail.com/changelog).
+The API is early (v0.x), so names can change between minor versions. 0.3.0 adds `entries.increment()`. 0.2.0 says `entries` where 0.1.0 said `weight`: an entrant is `{ entrantId, entries }`, and totals are `entrantCount` and `totalEntries`. The old names still work, marked deprecated. Each change is in the [changelog](https://docs.prizerail.com/changelog).
 
 ## Send entries
 
@@ -54,6 +54,21 @@ try {
   console.log(`${error.progress.sent} sent to ${error.progress.drawing.id}`)
 }
 ```
+
+### Add entries as they happen
+
+If you'd rather add entries when a user does something than send their running total, use `increment`. Each event carries an `eventId`, the id of the thing that happened, such as an order id or a referral id:
+
+```ts
+await campaign.entries.increment([
+  { entrantId, entries: 10, eventId: referral.id },
+])
+// { added, updated, duplicates, sent, batches, drawings }
+```
+
+Prizerail records each `eventId` for the campaign and ignores it if it comes again, so retries and a queue that delivers an event twice never add twice, even across a cutoff. Set the id once, when the event happens, and send the same one every time. An id made fresh on each attempt would add the entries again. If you have no id for the event, make a UUID when it happens and store it with the event.
+
+An increment goes to the drawing taking entries when it arrives, so an event after a cutoff counts in the next draw. `drawings` lists each drawing the batches went to.
 
 ### Entrant ids
 
