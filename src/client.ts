@@ -20,7 +20,7 @@ import type {
 } from "./types.js";
 import { type DrawProof, type VerifyResult, verifyDraw } from "./verify.js";
 
-export const VERSION = "0.3.2";
+export const VERSION = "0.3.3";
 
 const badPage = (detail: string) =>
   new PrizerailError(0, "invalid_response", `Paging stopped: ${detail}.`);
@@ -110,6 +110,13 @@ function checkEvents(events: EntrantEvent[]) {
     if (eventId === "" || e.eventId.length > ID_MAX) {
       throw new TypeError(
         `Event ${i} (${id}) needs an eventId of ${ID_MAX} characters or fewer: the id of the event behind these entries, the same on every retry.`
+      );
+    }
+    // An event takes `entries`. The older `weight` is refused by the API in
+    // this body, so it's refused here, before any batch is sent.
+    if ((e as { weight?: unknown }).weight !== undefined) {
+      throw new TypeError(
+        `Event ${i} (${eventId}): use entries, not the older weight.`
       );
     }
     const entries = e.entries ?? 1;

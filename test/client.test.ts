@@ -525,6 +525,12 @@ describe("entries.increment", () => {
         },
       ])
     ).rejects.toThrow("avatarUrl must be an https URL");
+    await expect(
+      client(fetch).entries.increment([
+        ...events,
+        { entrantId: "x", eventId: "ev-w", weight: 2 } as never,
+      ])
+    ).rejects.toThrow("not the older weight");
     expect(calls).toHaveLength(0);
   });
 
