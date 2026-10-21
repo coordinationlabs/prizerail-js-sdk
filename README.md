@@ -132,7 +132,7 @@ npx prizerail verify https://www.prizerail.com/campaigns/your-campaign/draws/DRA
 npx prizerail verify your-campaign DRAWING_ID
 ```
 
-A slug is looked up on www.prizerail.com. For a draw from a sandbox campaign, add `--site https://sandbox.prizerail.com`, or set `PRIZERAIL_API_KEY` to your `pr_sandbox_` key. The same goes for the public helpers without a key: `new Prizerail({ siteUrl: "https://sandbox.prizerail.com" })` reaches test campaigns.
+A slug is looked up on www.prizerail.com. For a draw from a sandbox campaign, add `--site https://sandbox.prizerail.com`, or set `PRIZERAIL_API_KEY` to your `pr_sandbox_` key. The same goes for the public helpers without a key: `new Prizerail({ siteUrl: "https://sandbox.prizerail.com" })` reaches sandbox campaigns.
 
 It exits 0 when every check passes, 1 when one fails, and 2 when the proof can't be read.
 
