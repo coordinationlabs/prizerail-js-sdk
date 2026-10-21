@@ -7,7 +7,9 @@ export type DrawingStatus =
   | "locked"
   | "entropy_requested"
   | "settled"
-  | "paid";
+  | "paid"
+  /** No entries by the cutoff, so closed without a draw. */
+  | "skipped";
 export type DrawingKind = "regular" | "guarantee";
 export type PayoutKind = "lump_sum" | "large_prize" | "guarantee";
 export type PayoutStatus =
