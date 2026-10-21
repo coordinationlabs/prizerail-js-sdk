@@ -13,8 +13,8 @@ Checks a draw from its public proof: the locked entrant list, the random
 value, and every winner and prize. Exits 0 when every check passes, 1 when
 one fails, and 2 when the proof can't be read.
 
-A slug is looked up on www.prizerail.com. For a test campaign, pass
---site https://test.prizerail.com, or set PRIZERAIL_API_KEY to a pr_test_ key.`;
+A slug is looked up on www.prizerail.com. For a sandbox campaign, pass
+--site https://sandbox.prizerail.com, or set PRIZERAIL_API_KEY to a pr_sandbox_ key.`;
 
 function print(result: VerifyResult) {
   const { proof, checks } = result;

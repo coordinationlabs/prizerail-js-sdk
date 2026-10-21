@@ -20,7 +20,7 @@ import type {
 } from "./types.js";
 import { type DrawProof, type VerifyResult, verifyDraw } from "./verify.js";
 
-export const VERSION = "0.4.0";
+export const VERSION = "0.5.0";
 
 const badPage = (detail: string) =>
   new PrizerailError(0, "invalid_response", `Paging stopped: ${detail}.`);
@@ -32,7 +32,7 @@ export type PrizerailOptions = {
   /** Your `pr_…` key. Only the public helpers work without one. */
   apiKey?: string;
   /**
-   * Defaults to https://test.prizerail.com for a `pr_test_` key and
+   * Defaults to https://sandbox.prizerail.com for a `pr_sandbox_` key and
    * https://www.prizerail.com otherwise. Set it to point anywhere else, such
    * as a local server.
    */
@@ -278,10 +278,10 @@ function normalizePage(
   };
 }
 
-/** The site a key belongs to: test keys only work on the test site. */
+/** The site a key belongs to: sandbox keys only work in the sandbox. */
 function defaultSiteUrl(apiKey?: string): string {
-  return apiKey?.trim().startsWith("pr_test_")
-    ? "https://test.prizerail.com"
+  return apiKey?.trim().startsWith("pr_sandbox_")
+    ? "https://sandbox.prizerail.com"
     : "https://www.prizerail.com";
 }
 
@@ -624,11 +624,11 @@ export class DrawingsClient {
   }
 
   /**
-   * Test environment only: closes the drawing's entries now and draws it,
+   * Sandbox only: closes the drawing's entries now and draws it,
    * instead of waiting for its cutoff. Resolves with the drawing, settled or
    * paid, or still `entropy_requested` if the random value is on its way, in
    * which case read it again with `get(id)`. Elsewhere it throws a
-   * PrizerailError with code `test_only`.
+   * PrizerailError with code `sandbox_only`.
    */
   async run(id: string): Promise<Drawing> {
     return (

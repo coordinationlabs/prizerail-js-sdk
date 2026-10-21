@@ -78,12 +78,16 @@ afterEach(() => {
 });
 
 describe("site", () => {
-  it("sends a pr_test_ key to the test site and others to production", () => {
-    expect(new Prizerail({ apiKey: "pr_test_abc" }).siteUrl).toBe(
-      "https://test.prizerail.com"
+  it("sends a pr_sandbox_ key to the sandbox and others to production", () => {
+    expect(new Prizerail({ apiKey: "pr_sandbox_abc" }).siteUrl).toBe(
+      "https://sandbox.prizerail.com"
     );
-    expect(new Prizerail({ apiKey: " pr_test_abc " }).siteUrl).toBe(
-      "https://test.prizerail.com"
+    expect(new Prizerail({ apiKey: " pr_sandbox_abc " }).siteUrl).toBe(
+      "https://sandbox.prizerail.com"
+    );
+    // The sandbox's old key prefix is gone, so it's treated like any other key.
+    expect(new Prizerail({ apiKey: "pr_test_abc" }).siteUrl).toBe(
+      "https://www.prizerail.com"
     );
     expect(new Prizerail({ apiKey: "pr_prod_abc" }).siteUrl).toBe(
       "https://www.prizerail.com"
@@ -97,19 +101,19 @@ describe("site", () => {
   it("lets an explicit siteUrl win over the key", () => {
     expect(
       new Prizerail({
-        apiKey: "pr_test_abc",
+        apiKey: "pr_sandbox_abc",
         siteUrl: "http://localhost:3000/",
       }).siteUrl
     ).toBe("http://localhost:3000");
   });
 
-  it("sends a pr_test_ key's requests to the test API", async () => {
+  it("sends a pr_sandbox_ key's requests to the sandbox API", async () => {
     const { fetch, calls } = scripted(json({ campaign: { slug: "demo" } }));
-    await new Prizerail({ apiKey: "pr_test_abc", fetch })
+    await new Prizerail({ apiKey: "pr_sandbox_abc", fetch })
       .campaign("demo")
       .get();
     expect(calls[0].url.href).toBe(
-      "https://test.prizerail.com/api/v1/campaigns/demo"
+      "https://sandbox.prizerail.com/api/v1/campaigns/demo"
     );
   });
 });

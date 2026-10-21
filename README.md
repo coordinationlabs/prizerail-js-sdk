@@ -11,7 +11,7 @@ The Prizerail SDK for JavaScript and TypeScript. Send entries, read results and 
 npm install prizerail
 ```
 
-The API is early (v0.x), so names can change between minor versions. 0.4.0 sends a `pr_test_` key to https://test.prizerail.com unless you pass `siteUrl`. 0.3.0 adds `entries.increment()`, 0.3.1 checks every event before sending any and lists only the drawings that took entries, and 0.3.2 and 0.3.3 check avatar URLs, names and the older `weight` up front too. 0.2.0 says `entries` where 0.1.0 said `weight`: an entrant is `{ entrantId, entries }`, and totals are `entrantCount` and `totalEntries`. The old names still work, marked deprecated. Each change is in the [changelog](https://docs.prizerail.com/changelog).
+The API is early (v0.x), so names can change between minor versions. 0.5.0 sends a `pr_sandbox_` key to https://sandbox.prizerail.com unless you pass `siteUrl` (0.4.0 did the same for the old `pr_test_` keys). 0.3.0 adds `entries.increment()`, 0.3.1 checks every event before sending any and lists only the drawings that took entries, and 0.3.2 and 0.3.3 check avatar URLs, names and the older `weight` up front too. 0.2.0 says `entries` where 0.1.0 said `weight`: an entrant is `{ entrantId, entries }`, and totals are `entrantCount` and `totalEntries`. The old names still work, marked deprecated. Each change is in the [changelog](https://docs.prizerail.com/changelog).
 
 ## Send entries
 
@@ -99,9 +99,9 @@ for await (const drawing of campaign.drawings.all({ status: "paid" })) {
 const guarantees = await campaign.guarantees.list()
 ```
 
-## Draw now, in test
+## Draw now, in the sandbox
 
-In the test environment, `campaign.drawings.run(id)` closes a drawing's entries now and draws it, so you can see a whole draw without waiting for its cutoff. It resolves with the drawing, usually settled within seconds. Anywhere else it throws a `PrizerailError` with code `test_only`. See [Draw now](https://docs.prizerail.com/api/drawings#draw-now-test-only).
+In the sandbox, `campaign.drawings.run(id)` closes a drawing's entries now and draws it, so you can see a whole draw without waiting for its cutoff. It resolves with the drawing, usually settled within seconds. Anywhere else it throws a `PrizerailError` with code `sandbox_only`. See [Draw now](https://docs.prizerail.com/api/drawings#draw-now-sandbox-only).
 
 ## Errors
 
@@ -132,7 +132,7 @@ npx prizerail verify https://www.prizerail.com/campaigns/your-campaign/draws/DRA
 npx prizerail verify your-campaign DRAWING_ID
 ```
 
-A slug is looked up on www.prizerail.com. For a draw from a test campaign, add `--site https://test.prizerail.com`, or set `PRIZERAIL_API_KEY` to your `pr_test_` key. The same goes for the public helpers without a key: `new Prizerail({ siteUrl: "https://test.prizerail.com" })` reaches test campaigns.
+A slug is looked up on www.prizerail.com. For a draw from a sandbox campaign, add `--site https://sandbox.prizerail.com`, or set `PRIZERAIL_API_KEY` to your `pr_sandbox_` key. The same goes for the public helpers without a key: `new Prizerail({ siteUrl: "https://sandbox.prizerail.com" })` reaches test campaigns.
 
 It exits 0 when every check passes, 1 when one fails, and 2 when the proof can't be read.
 
@@ -141,7 +141,7 @@ It exits 0 when every check passes, 1 when one fails, and 2 when the proof can't
 ```ts
 new Prizerail({
   apiKey: "pr_…",
-  siteUrl: "https://www.prizerail.com", // the default, or https://test.prizerail.com for a pr_test_ key
+  siteUrl: "https://www.prizerail.com", // the default, or https://sandbox.prizerail.com for a pr_sandbox_ key
   timeoutMs: 30_000, // per attempt
   maxRetries: 4,
   fetch, // your own fetch, if you need one
