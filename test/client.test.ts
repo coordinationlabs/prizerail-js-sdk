@@ -50,9 +50,9 @@ const drawingRef = (id: string, cutoffAt = inAnHour()) => ({
 const openPage = (id: string, cutoffAt?: string) =>
   json({
     drawing: { ...drawingRef(id, cutoffAt), status: "open" },
-    count: 0,
-    totalWeight: 0,
-    entries: [],
+    entrantCount: 0,
+    totalEntries: 0,
+    entrants: [],
     next: null,
   });
 const accepted = (id: string, n: number, count: number, cutoffAt?: string) =>
@@ -61,8 +61,8 @@ const accepted = (id: string, n: number, count: number, cutoffAt?: string) =>
     added: n,
     updated: 0,
     unchanged: 0,
-    count,
-    totalWeight: count,
+    entrantCount: count,
+    totalEntries: count,
   });
 
 function client(fetch: typeof globalThis.fetch) {
@@ -231,9 +231,9 @@ describe("bad responses and options", () => {
     const page = () =>
       json({
         drawing: { ...drawingRef("d1"), status: "open" },
-        count: 9,
-        totalWeight: 9,
-        entries: [{ entrantId: "a", weight: 1 }],
+        entrantCount: 9,
+        totalEntries: 9,
+        entrants: [{ entrantId: "a", entries: 1 }],
         next: "5",
       });
     const { fetch } = scripted(page(), page());
@@ -284,7 +284,7 @@ describe("entries.send", () => {
       drawing: { id: "d1" },
       sent: 2500,
       added: 2500,
-      count: 2500,
+      entrantCount: 2500,
       batches: 3,
     });
     expect(calls[0].url.searchParams.get("limit")).toBe("1");
@@ -376,33 +376,28 @@ describe("entries.send", () => {
   });
 });
 
-describe("entries and the older weight", () => {
-  it("sends entries, and maps a deprecated weight to entries", async () => {
-    const { fetch, calls } = scripted(accepted("d1", 3, 3));
-    await client(fetch).entries.send(
-      ["a", { entrantId: "b", entries: 5 }, { entrantId: "c", weight: 2 }],
-      { drawing: drawingRef("d1") }
-    );
+describe("entries, not the older weight", () => {
+  it("sends entries", async () => {
+    const { fetch, calls } = scripted(accepted("d1", 2, 2));
+    await client(fetch).entries.send(["a", { entrantId: "b", entries: 5 }], {
+      drawing: drawingRef("d1"),
+    });
     expect(calls[0].body).toEqual({
-      entrants: [
-        "a",
-        { entrantId: "b", entries: 5 },
-        { entrantId: "c", entries: 2 },
-      ],
+      entrants: ["a", { entrantId: "b", entries: 5 }],
     });
   });
 
-  it("refuses an entrant with both entries and weight", async () => {
+  it("refuses an entrant with the older weight before sending", async () => {
     const { fetch, calls } = scripted();
     await expect(
-      client(fetch).entries.send([{ entrantId: "x", entries: 1, weight: 1 }], {
+      client(fetch).entries.send([{ entrantId: "x", weight: 2 } as never], {
         drawing: drawingRef("d1"),
       })
-    ).rejects.toThrow("both entries and weight");
+    ).rejects.toThrow("not the older weight");
     expect(calls).toHaveLength(0);
   });
 
-  it("gives both names for totals, whichever the server sent", async () => {
+  it("gives the drawing's totals", async () => {
     const { fetch } = scripted(
       json({
         drawing: drawingRef("d1"),
@@ -416,31 +411,25 @@ describe("entries and the older weight", () => {
     const r = await client(fetch).entries.send(["a"], {
       drawing: drawingRef("d1"),
     });
-    expect(r).toMatchObject({
-      entrantCount: 7,
-      totalEntries: 70,
-      count: 7,
-      totalWeight: 70,
-    });
+    expect(r).toMatchObject({ entrantCount: 7, totalEntries: 70 });
+    expect(r).not.toHaveProperty("count");
+    expect(r).not.toHaveProperty("totalWeight");
   });
 
-  it("reads a page from an older server", async () => {
+  it("reads a page with only the current names", async () => {
     const { fetch } = scripted(
       json({
         drawing: { ...drawingRef("d1"), status: "open" },
-        count: 1,
-        totalWeight: 4,
-        entries: [{ entrantId: "a", weight: 4 }],
+        entrantCount: 1,
+        totalEntries: 4,
+        entrants: [{ entrantId: "a", entries: 4, weight: 4 }],
         next: null,
       })
     );
     const page = await client(fetch).entries.list();
     expect(page).toMatchObject({ entrantCount: 1, totalEntries: 4 });
-    expect(page.entrants[0]).toMatchObject({
-      entrantId: "a",
-      entries: 4,
-      weight: 4,
-    });
+    expect(page).not.toHaveProperty("entries");
+    expect(page.entrants[0]).toEqual({ entrantId: "a", entries: 4 });
   });
 });
 
@@ -466,9 +455,13 @@ describe("malformed responses", () => {
     });
   });
 
-  it("refuses totals whose two names disagree", async () => {
+  it("refuses a page in the older shape", async () => {
     const { fetch } = scripted(
-      page({ entrantCount: 10, count: 9, totalEntries: 10, entrants: [] })
+      page({
+        count: 1,
+        totalWeight: 4,
+        entries: [{ entrantId: "a", weight: 4 }],
+      })
     );
     await expect(client(fetch).entries.list()).rejects.toMatchObject({
       code: "invalid_response",
@@ -625,9 +618,9 @@ describe("paging", () => {
     const page = (entries: string[], next: string | null) =>
       json({
         drawing: { ...drawingRef("d1"), status: "open" },
-        count: 3,
-        totalWeight: 3,
-        entries: entries.map(entrantId => ({ entrantId, weight: 1 })),
+        entrantCount: 3,
+        totalEntries: 3,
+        entrants: entries.map(entrantId => ({ entrantId, entries: 1 })),
         next,
       });
     // Real cursors are strings, and "1000" sorts before "999" as text.

@@ -11,7 +11,7 @@ The Prizerail SDK for JavaScript and TypeScript. Send entries, read results and 
 npm install prizerail
 ```
 
-The API is early (v0.x), so names can change between minor versions. Each change is in the [changelog](https://docs.prizerail.com/changelog).
+Versions follow [semver](https://semver.org): within 1.x nothing is removed or renamed, and new features come in minor versions. Each release is in the [changelog](https://docs.prizerail.com/changelog).
 
 ## Use it from your server
 
@@ -183,6 +183,6 @@ Issues and pull requests are welcome. For a security problem, email team@coordin
 4. Tag the commit you published, so each npm version maps to its source:
 
    ```sh
-   git tag v0.5.2
-   git push origin v0.5.2
+   git tag v1.0.0
+   git push origin v1.0.0
    ```

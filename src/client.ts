@@ -20,7 +20,7 @@ import type {
 } from "./types.js";
 import { type DrawProof, type VerifyResult, verifyDraw } from "./verify.js";
 
-export const VERSION = "0.5.2";
+export const VERSION = "1.0.0";
 
 const badPage = (detail: string) =>
   new PrizerailError(0, "invalid_response", `Paging stopped: ${detail}.`);
@@ -186,31 +186,24 @@ function checkIncrementResponse(r: unknown) {
   return res as SendEntriesResponse & { duplicates?: number };
 }
 
-/** An entrant as the API takes it: `entries`, never the older `weight`. */
+/**
+ * An entrant as the API takes it. The older `weight` is gone from 1.0.0, so
+ * it's refused rather than sent, which would count the entrant once.
+ */
 function toWire(entrant: Entrant): Entrant {
   if (typeof entrant === "string") return entrant;
-  const { weight, ...rest } = entrant;
-  if (weight === undefined) return rest;
-  if (rest.entries !== undefined) {
+  if ((entrant as { weight?: unknown }).weight !== undefined) {
     throw new TypeError(
-      `Entrant ${rest.entrantId} has both entries and weight. Send entries.`
+      `Entrant ${entrant.entrantId}: use entries, not the older weight.`
     );
   }
-  return { ...rest, entries: weight };
+  return entrant;
 }
 
-/** Totals as the server may send them: current names, older names, or both. */
+/** A drawing's totals as the server sends them. */
 type WireTotals = {
   entrantCount?: unknown;
   totalEntries?: unknown;
-  count?: unknown;
-  totalWeight?: unknown;
-};
-
-/** An entrant row as the server may send it. */
-type WireEntrant = Omit<SentEntrant, "entries" | "weight"> & {
-  entries?: number;
-  weight?: number;
 };
 
 const badResponse = (detail: string) =>
@@ -219,61 +212,52 @@ const badResponse = (detail: string) =>
 const isCount = (v: unknown): v is number =>
   typeof v === "number" && Number.isSafeInteger(v) && v >= 0;
 
-/** One of a pair of names for the same total, which must agree if both came. */
-function pick(r: WireTotals, current: keyof WireTotals, old: keyof WireTotals) {
-  const a = r[current];
-  const b = r[old];
-  if (a !== undefined && b !== undefined && a !== b) {
-    throw badResponse(
-      `${String(current)} ${a} and ${String(old)} ${b} disagree.`
-    );
-  }
-  const value = a ?? b;
+/** A total the response must carry as a whole number from 0. */
+function count(r: WireTotals, name: keyof WireTotals) {
+  const value = r[name];
   if (!isCount(value)) {
-    throw badResponse(`The response has no valid ${String(current)}.`);
+    throw badResponse(`The response has no valid ${name}.`);
   }
   return value;
 }
 
-/** Both names for the totals, from whichever the server sent. */
+/** The drawing's totals, checked. */
 function totals(r: WireTotals) {
-  const entrantCount = pick(r, "entrantCount", "count");
-  const totalEntries = pick(r, "totalEntries", "totalWeight");
   return {
-    entrantCount,
-    totalEntries,
-    count: entrantCount,
-    totalWeight: totalEntries,
+    entrantCount: count(r, "entrantCount"),
+    totalEntries: count(r, "totalEntries"),
   };
 }
 
-/** A page with the current names filled in, from either server shape. */
+/** A page with its totals and entrants checked. */
 function normalizePage(
   page: WireTotals & {
     drawing: EntriesPage["drawing"];
-    entrants?: WireEntrant[];
-    entries?: WireEntrant[];
+    entrants?: SentEntrant[];
     next: string | null;
   }
 ): EntriesPage {
-  const rows = page.entrants ?? page.entries;
+  const rows = page.entrants;
   if (!Array.isArray(rows)) {
     throw badResponse("The response has no entrants list.");
   }
   const entrants = rows.map(e => {
-    const n = e.entries ?? e.weight;
-    if (!isCount(n) || n < 1 || typeof e.entrantId !== "string") {
+    if (
+      !isCount(e.entries) ||
+      e.entries < 1 ||
+      typeof e.entrantId !== "string"
+    ) {
       throw badResponse(
         "An entrant in the response has no valid id or entries."
       );
     }
-    return { ...e, entries: n, weight: n };
+    const { weight: _, ...rest } = e as SentEntrant & { weight?: number };
+    return rest;
   });
   return {
     drawing: page.drawing,
     ...totals(page),
     entrants,
-    entries: entrants,
     next: page.next,
   };
 }
