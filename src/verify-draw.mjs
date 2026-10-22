@@ -794,6 +794,11 @@ if (
     .then(([{ pathToFileURL }, { realpathSync }]) => {
       const here = import.meta.url;
       const arg = process.argv[1];
+      // -e and --eval leave no script slot in argv, so argv[1] is never this
+      // file there, and main() would read the wrong arguments.
+      const evalRun = process.execArgv.some(
+        a => a === "-e" || a === "--eval" || a.startsWith("--eval=")
+      );
       const isMain = () => {
         // Deno, Bun and recent Node say true for the entry point, even for a
         // remote URL.
@@ -807,7 +812,7 @@ if (
         }
         // An importer: trust it, so Deno never asks to read the file system.
         if (import.meta.main === false) return false;
-        if (!arg) return false;
+        if (!arg || evalRun) return false;
         if (pathToFileURL(arg).href === here) return true;
         // argv[1] may go through a symlink (pnpm's node_modules), and
         // import.meta.url is the real path unless --preserve-symlinks-main.
@@ -818,9 +823,8 @@ if (
         }
       };
       if (!isMain()) return;
-      // With -e there's no script slot in argv, so main() would read the
-      // wrong arguments. Say how to run it rather than check nothing.
-      if (process.execArgv.some(a => a === "-e" || a === "--eval")) {
+      // Say how to run it rather than check nothing.
+      if (evalRun) {
         console.error(
           "Run it from a file or stdin: node verify-draw.mjs <proof.json>"
         );

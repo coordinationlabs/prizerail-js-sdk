@@ -44,8 +44,8 @@ jobs:
         run: node -e 'require("./dist/index.js")'
 
       # Run as a script, the verifier must never exit 0 without checking a
-      # draw. From a file or stdin it tries to read the proof. -e, which has
-      # no script slot in argv, is refused with how to run it.
+      # draw. From a file or stdin it tries to read the proof. -e and --eval,
+      # which leave no script slot in argv, are refused with how to run it.
       - name: verify-draw.mjs never passes silently
         run: |
           expect() {
@@ -61,6 +61,7 @@ jobs:
           expect stdin missing.json sh -c 'node - missing.json < dist/verify-draw.mjs'
           expect eval "from a file or stdin" node -e "$script" missing.json
           expect "eval, no args" "from a file or stdin" node -e "$script"
+          expect "eval=" "from a file or stdin" node --eval="$script" missing.json
 
       # An app that bundles the SDK into one file must not run the verify CLI
       # at startup. The SDK imports verify-core.mjs, which the build cuts
