@@ -43,6 +43,14 @@ jobs:
       - name: require()
         run: node -e 'require("./dist/index.js")'
 
+      # An app that bundles the SDK into one file must not run the verify CLI
+      # at startup: the bundle's import.meta.url is the app's own entry point.
+      - name: Bundled app
+        run: |
+          echo 'import { Prizerail } from "./dist/index.js"; console.log(typeof Prizerail)' > bundle-app.mjs
+          npx --yes esbuild@0.25.0 bundle-app.mjs --bundle --platform=node --format=esm --outfile=bundle-out.mjs --log-level=warning
+          test "$(node bundle-out.mjs)" = "function"
+
       # The packed tarball is what npm users get, so check it has the CLI and the verify script.
       - name: Pack
         run: |
