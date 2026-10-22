@@ -7,8 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 rmSync(join(root, "dist"), { recursive: true, force: true });
-// The repo's TypeScript, from the app's node_modules.
-const tsc = join(root, "../../node_modules/.bin/tsc");
+const tsc = join(root, "node_modules/.bin/tsc");
 execFileSync(tsc, ["-p", join(root, "tsconfig.json")], { stdio: "inherit" });
 copyFileSync(
   join(root, "src/verify-draw.mjs"),

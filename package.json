@@ -4,6 +4,13 @@
   "description": "The Prizerail SDK: send entries, read draws and verify them.",
   "license": "MIT",
   "homepage": "https://docs.prizerail.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/coordinationlabs/prizerail-js-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/coordinationlabs/prizerail-js-sdk/issues"
+  },
   "type": "module",
   "exports": {
     ".": {
@@ -27,6 +34,10 @@
   "sideEffects": false,
   "scripts": {
     "build": "node scripts/build.mjs",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "type-check": "tsc --noEmit -p tsconfig.check.json",
+    "test": "vitest run",
     "prepublishOnly": "node scripts/build.mjs"
   },
   "keywords": [
@@ -35,5 +46,12 @@
     "prize draw",
     "pyth",
     "verifiable"
-  ]
+  ],
+  "packageManager": "pnpm@10.18.3",
+  "devDependencies": {
+    "@biomejs/biome": "2.5.6",
+    "@types/node": "24.13.3",
+    "typescript": "6.0.3",
+    "vitest": "4.1.11"
+  }
 }

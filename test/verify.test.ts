@@ -1,22 +1,7 @@
 import { createHmac } from "node:crypto";
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { hashEntrant, verifyDraw, wasEntered } from "../src/index.js";
 import { winnerHash } from "../src/verify-draw.mjs";
-
-describe("the bundled verify script", () => {
-  it("is the public one, unchanged", () => {
-    const shipped = readFileSync(
-      new URL("../src/verify-draw.mjs", import.meta.url),
-      "utf8"
-    );
-    const published = readFileSync(
-      new URL("../../../public/verify/verify-draw.mjs", import.meta.url),
-      "utf8"
-    );
-    expect(shipped).toBe(published);
-  });
-});
 
 describe("hashEntrant", () => {
   it("matches Node's createHmac", async () => {

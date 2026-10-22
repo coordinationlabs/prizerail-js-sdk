@@ -149,3 +149,25 @@ new Prizerail({
 ```
 
 Keep the API key on your server. It can send entries for every campaign under your account.
+
+## Development
+
+```sh
+pnpm install
+pnpm lint
+pnpm type-check
+pnpm test
+pnpm build
+```
+
+Issues and pull requests are welcome. For a security problem, email team@coordinationlabs.com instead of opening an issue.
+
+`src/verify-draw.mjs` is the public verify script that prizerail.com serves at `/verify/verify-draw.mjs`. Keep the two the same: a change to how draws are checked goes in both, and prizerail.com's tests fail if its copy differs from the one in the published package.
+
+### Releasing
+
+1. Bump `version` in `package.json` and `VERSION` in `src/client.ts`, and add a line to the change list above.
+2. Merge to `main`.
+3. Push a tag for the version, like `git tag v0.5.2 && git push origin v0.5.2`.
+
+The release workflow checks the tag matches `package.json`, runs the checks, and publishes to npm with a provenance statement linking the version to its commit.

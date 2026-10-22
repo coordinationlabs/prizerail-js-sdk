@@ -1,6 +1,7 @@
 /**
  * Types for verify-draw.mjs, the public verify script, which this package
- * ships unchanged (a test checks it matches public/verify/verify-draw.mjs).
+ * ships unchanged. prizerail.com serves the same file at /verify/verify-draw.mjs,
+ * and its tests check that copy matches the one in the published package.
  */
 export type Check = { ok: boolean | null; label: string; detail?: string };
 /** [index, keccak256(entrantId), weight] */

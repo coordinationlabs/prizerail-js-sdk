@@ -1,0 +1,46 @@
+name: Release
+
+# Push a tag like v0.5.2 to publish that version to npm.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  # npm trusted publishing: npm checks this workflow's OIDC token, so no
+  # npm token is stored here, and the release gets a provenance statement.
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: npm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      # Node 24 ships npm 11, which trusted publishing needs.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Tag matches package.json
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME doesn't match package.json version $version"
+            exit 1
+          fi
+
+      - run: pnpm lint
+      - run: pnpm type-check
+      - run: pnpm test
+
+      # prepublishOnly builds dist first.
+      - run: npm publish --access public

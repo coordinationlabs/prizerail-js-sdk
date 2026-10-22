@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        # The package supports Node 20 and later.
+        node: [20, 22, 24]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm type-check
+      - run: pnpm test
+      - run: pnpm build
+
+      # The packed tarball is what npm users get, so check it has the CLI and the verify script.
+      - name: Pack
+        run: |
+          npm pack --dry-run --json > pack.json
+          for f in dist/index.js dist/cli.js dist/verify-draw.mjs dist/verify-draw.d.mts README.md LICENSE; do
+            jq -e --arg f "$f" '.[0].files | map(.path) | index($f)' pack.json > /dev/null || { echo "missing $f"; exit 1; }
+          done
