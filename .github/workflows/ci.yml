@@ -43,17 +43,24 @@ jobs:
       - name: require()
         run: node -e 'require("./dist/index.js")'
 
-      # Run as a script, from a file, stdin or -e, the verifier must never
-      # exit 0 without checking a draw. With a missing proof it must fail.
+      # Run as a script, the verifier must never exit 0 without checking a
+      # draw. From a file or stdin it tries to read the proof. -e, which has
+      # no script slot in argv, is refused with how to run it.
       - name: verify-draw.mjs never passes silently
         run: |
-          set +e
-          node dist/verify-draw.mjs missing.json; file=$?
-          node - missing.json < dist/verify-draw.mjs; stdin=$?
-          node -e "$(cat dist/verify-draw.mjs)" missing.json; evald=$?
-          set -e
-          echo "file=$file stdin=$stdin eval=$evald"
-          [ "$file" -ne 0 ] && [ "$stdin" -ne 0 ] && [ "$evald" -ne 0 ]
+          expect() {
+            name="$1"; want="$2"; shift 2
+            set +e
+            err="$("$@" 2>&1 >/dev/null)"; rc=$?
+            set -e
+            echo "$name: exit $rc, $err" | head -c 300; echo
+            [ "$rc" -ne 0 ] && printf '%s' "$err" | grep -q "$want"
+          }
+          script="$(cat dist/verify-draw.mjs)"
+          expect file missing.json node dist/verify-draw.mjs missing.json
+          expect stdin missing.json sh -c 'node - missing.json < dist/verify-draw.mjs'
+          expect eval "from a file or stdin" node -e "$script" missing.json
+          expect "eval, no args" "from a file or stdin" node -e "$script"
 
       # An app that bundles the SDK into one file must not run the verify CLI
       # at startup. The SDK imports verify-core.mjs, which the build cuts

@@ -788,8 +788,7 @@ if (import.meta.main === true && typeof process === "undefined") {
 }
 if (
   typeof process !== "undefined" &&
-  typeof process.versions?.node === "string" &&
-  process.argv?.[1]
+  typeof process.versions?.node === "string"
 ) {
   Promise.all([import("node:url"), import("node:fs")])
     .then(([{ pathToFileURL }, { realpathSync }]) => {
@@ -808,6 +807,7 @@ if (
         }
         // An importer: trust it, so Deno never asks to read the file system.
         if (import.meta.main === false) return false;
+        if (!arg) return false;
         if (pathToFileURL(arg).href === here) return true;
         // argv[1] may go through a symlink (pnpm's node_modules), and
         // import.meta.url is the real path unless --preserve-symlinks-main.
@@ -817,12 +817,20 @@ if (
           return false;
         }
       };
-      if (isMain()) {
-        main().catch(error => {
-          console.error(error.message);
-          process.exit(2);
-        });
+      if (!isMain()) return;
+      // With -e there's no script slot in argv, so main() would read the
+      // wrong arguments. Say how to run it rather than check nothing.
+      if (process.execArgv.some(a => a === "-e" || a === "--eval")) {
+        console.error(
+          "Run it from a file or stdin: node verify-draw.mjs <proof.json>"
+        );
+        process.exitCode = 2;
+        return;
       }
+      main().catch(error => {
+        console.error(error.message);
+        process.exit(2);
+      });
     })
     .catch(error => {
       // Couldn't tell how it was started. Say so, not exit 0 as if verified.
