@@ -781,15 +781,25 @@ async function main() {
 // Run main() only when called as a script, under any file name, not when
 // imported. No top-level await, so a CommonJS require() can load this file.
 // Started as a script, it must never exit 0 without checking the draw.
-if (typeof process !== "undefined" && process.argv?.[1]) {
+if (import.meta.main === true && typeof process === "undefined") {
+  // Deno 1 has no process, so it can't run main().
+  console.error("Run this with Node.js 18 or later, or Deno 2 or later.");
+  globalThis.Deno?.exit(2);
+}
+if (
+  typeof process !== "undefined" &&
+  typeof process.versions?.node === "string" &&
+  process.argv?.[1]
+) {
   Promise.all([import("node:url"), import("node:fs")])
     .then(([{ pathToFileURL }, { realpathSync }]) => {
       const here = import.meta.url;
       const arg = process.argv[1];
       const isMain = () => {
-        // Deno, Bun and Node 24.2+ say so directly, even for a remote URL.
-        if (import.meta.main === true) return true;
-        // This file itself read from stdin (`node -`) or eval.
+        // Deno, Bun and recent Node 22 and 24 say so directly, even for a remote URL
+        // or stdin, so trust them and don't touch the file system.
+        if (typeof import.meta.main === "boolean") return import.meta.main;
+        // Older Node: this file itself read from stdin (`node -`) or eval.
         if (/\/\[eval\d*\]$/.test(here)) return true;
         if (pathToFileURL(arg).href === here) return true;
         // argv[1] may go through a symlink (pnpm's node_modules), and
