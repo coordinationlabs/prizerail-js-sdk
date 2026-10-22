@@ -168,6 +168,17 @@ Issues and pull requests are welcome. For a security problem, email team@coordin
 
 1. Bump `version` in `package.json` and `VERSION` in `src/client.ts`, and add a line to the change list above.
 2. Merge to `main`.
-3. Push a tag for the version, like `git tag v0.5.2 && git push origin v0.5.2`.
+3. From an up-to-date `main`, run the checks and publish. `npm publish` builds `dist` first.
 
-The release workflow checks the tag matches `package.json`, runs the checks, and publishes to npm with a provenance statement linking the version to its commit.
+   ```sh
+   pnpm install --frozen-lockfile
+   pnpm lint && pnpm type-check && pnpm test
+   npm publish
+   ```
+
+4. Tag the commit you published, so each npm version maps to its source:
+
+   ```sh
+   git tag v0.5.2
+   git push origin v0.5.2
+   ```
