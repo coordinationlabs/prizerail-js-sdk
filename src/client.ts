@@ -221,7 +221,7 @@ function checkSendResponse(r: unknown, progress: SendProgress) {
   } catch (error) {
     const e = error as PrizerailError;
     throw badResponse(
-      `${e.detail} ${progress.sent} entries were confirmed in drawing ${progress.drawing.id} before it. Check what it has before sending again.`
+      `${e.detail} ${progress.sent} entrants were confirmed in drawing ${progress.drawing.id} before it. Check what it has before sending again.`
     );
   }
   return res as SendEntriesResponse;

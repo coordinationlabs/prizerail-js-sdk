@@ -5,7 +5,7 @@ The Prizerail SDK for JavaScript and TypeScript. Send entries, read results and 
 - Typed client for the [partner API](https://docs.prizerail.com/api/authentication), with paging and safe retries.
 - `verifyDraw`, the same checks as the public verify script, plus `wasEntered` to find someone in a locked list.
 - `npx prizerail verify` from the command line.
-- No dependencies. Node 20 or later, Deno, Bun, and edge runtimes with `fetch` and WebCrypto.
+- No dependencies. Node 20.19 or later (for `require()` as well as `import`), Deno, Bun, and edge runtimes with `fetch` and WebCrypto.
 
 ```sh
 npm install prizerail
@@ -48,7 +48,7 @@ Sending an entrant again before the cutoff only sets their entries, so a retry i
 - It sends no batch and starts no retry within the request timeout (30 seconds) of that drawing's cutoff. It throws `PrizerailCutoffError` instead.
 - If a batch still lands in another drawing, it throws `PrizerailDrawingChangedError`.
 
-Both errors carry `progress`, which says how many entries the drawing confirmed. Check what it has with `entries.list({ drawing })` before you send the rest.
+Both errors carry `progress`, which says how many entrants the drawing confirmed. Check what it has with `entries.list({ drawing })` before you send the rest.
 
 ```ts
 import { PrizerailCutoffError } from "prizerail"

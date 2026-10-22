@@ -521,7 +521,9 @@ describe("malformed responses", () => {
       client(fetch).entries.send(ids, { drawing: drawingRef("d1") })
     ).rejects.toMatchObject({
       code: "invalid_response",
-      detail: expect.stringContaining("0 entries were confirmed in drawing d1"),
+      detail: expect.stringContaining(
+        "0 entrants were confirmed in drawing d1"
+      ),
     });
     expect(calls).toHaveLength(1);
   });

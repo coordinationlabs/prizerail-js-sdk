@@ -20,7 +20,7 @@ export class PrizerailError extends Error {
 /** What a send had stored before it stopped. */
 export type SendProgress = {
   drawing: DrawingRef;
-  /** Entries in the batches Prizerail confirmed. */
+  /** Entrants in the batches Prizerail confirmed. */
   sent: number;
   added: number;
   updated: number;
