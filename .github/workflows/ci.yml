@@ -20,8 +20,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The package supports Node 20 and later.
-        node: [20, 22, 24]
+        # The package supports Node 20.19+ and 22.12+, the first with require()
+        # of ES modules, so test those floors as well as the latest.
+        node: ["20.19.0", "22.12.0", 20, 22, 24]
     steps:
       - uses: actions/checkout@v4
 
@@ -37,6 +38,10 @@ jobs:
       - run: pnpm type-check
       - run: pnpm test
       - run: pnpm build
+
+      # CommonJS users load the ESM build through require(), so keep it loadable.
+      - name: require()
+        run: node -e 'require("./dist/index.js")'
 
       # The packed tarball is what npm users get, so check it has the CLI and the verify script.
       - name: Pack

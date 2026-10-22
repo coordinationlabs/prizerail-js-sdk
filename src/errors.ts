@@ -29,7 +29,7 @@ export type SendProgress = {
 
 /**
  * A send stopped so that no entry lands in the drawing after the one it
- * targeted. Entries past `progress.sent` were not confirmed: check with
+ * targeted. Entrants past `progress.sent` were not confirmed: check with
  * `entries.list({ drawing })` before sending them to the next drawing.
  */
 export class PrizerailCutoffError extends PrizerailError {

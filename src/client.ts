@@ -25,7 +25,7 @@ export const VERSION = "1.0.0";
 const badPage = (detail: string) =>
   new PrizerailError(0, "invalid_response", `Paging stopped: ${detail}.`);
 
-/** The API takes up to this many entries per request. */
+/** The API takes up to this many entrants, or events, per request. */
 export const ENTRIES_PER_REQUEST = 1000;
 
 export type PrizerailOptions = {
@@ -397,7 +397,7 @@ export class EntriesClient {
   constructor(private readonly campaign: CampaignClient) {}
 
   /**
-   * Sends entries to one drawing, in requests of 1,000, retrying 429s, 5xx
+   * Sends entrants to one drawing, in requests of 1,000, retrying 429s, 5xx
    * and network errors. Sending an entrant again before the cutoff only sets
    * their entries, so a retry is safe, but a retry after the cutoff would go
    * to the next drawing. So the send is pinned to one drawing: it stops with
@@ -409,7 +409,7 @@ export class EntriesClient {
     options: SendOptions = {}
   ): Promise<SendResult> {
     const entries = entrants.map(toWire);
-    if (entries.length === 0) throw new Error("send() needs entries.");
+    if (entries.length === 0) throw new Error("send() needs entrants.");
     const margin =
       options.cutoffMarginMs ?? this.campaign.http.options.timeoutMs;
     // A bad margin or cutoff would turn the cutoff guard off, so refuse them.

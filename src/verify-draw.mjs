@@ -777,9 +777,12 @@ async function main() {
 // Run main() only when called as a script, not when imported. No top-level
 // await, so a CommonJS require() of the package can load this file.
 if (typeof process !== "undefined" && process.argv?.[1]) {
-  import("node:url")
-    .then(({ pathToFileURL }) => {
-      if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  // import.meta.url is the real path, so resolve symlinks in argv[1] too, or
+  // a run through pnpm's node_modules would do nothing and exit 0.
+  Promise.all([import("node:url"), import("node:fs")])
+    .then(([{ pathToFileURL }, { realpathSync }]) => {
+      const script = pathToFileURL(realpathSync(process.argv[1])).href;
+      if (import.meta.url === script) {
         main().catch(error => {
           console.error(error.message);
           process.exit(2);

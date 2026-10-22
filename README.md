@@ -5,7 +5,7 @@ The Prizerail SDK for JavaScript and TypeScript. Send entries, read results and 
 - Typed client for the [partner API](https://docs.prizerail.com/api/authentication), with paging and safe retries.
 - `verifyDraw`, the same checks as the public verify script, plus `wasEntered` to find someone in a locked list.
 - `npx prizerail verify` from the command line.
-- No dependencies. Node 20.19 or later (for `require()` as well as `import`), Deno, Bun, and edge runtimes with `fetch` and WebCrypto.
+- No dependencies. Node 20.19+ or 22.12+, with `import` or `require()`, Deno, Bun, and edge runtimes with `fetch` and WebCrypto.
 
 ```sh
 npm install prizerail
@@ -27,20 +27,20 @@ import { Prizerail, hashEntrant } from "prizerail"
 const prizerail = new Prizerail({ apiKey: process.env.PRIZERAIL_API_KEY })
 const campaign = prizerail.campaign("your-campaign")
 
-const entries = await Promise.all(
+const entrants = await Promise.all(
   users.map(async user => ({
     entrantId: await hashEntrant(user.id, process.env.ENTRANT_ID_KEY!),
     entries: user.tickets,
   }))
 )
 
-const result = await campaign.entries.send(entries)
+const result = await campaign.entries.send(entrants)
 // { drawing: { id, drawAt, cutoffAt }, sent, added, updated, unchanged, entrantCount, totalEntries, batches }
 ```
 
 `entrantCount` and `totalEntries` are the drawing's own totals, so reconcile with those. `added`, `updated` and `unchanged` add up what each batch reported, and a batch that was stored before its response was lost comes back as `unchanged` on the retry.
 
-`send` takes any number of entries and sends them in requests of 1,000. It retries a `429`, a `5xx`, a timeout or a network error with a jittered, growing wait, and honors `Retry-After`.
+`send` takes any number of entrants and sends them in requests of 1,000. It retries a `429`, a `5xx`, a timeout or a network error with a jittered, growing wait, and honors `Retry-After`.
 
 Sending an entrant again before the cutoff only sets their entries, so a retry is safe until then. After the cutoff a retry would go to the next drawing, so every send is pinned to one drawing:
 
@@ -54,7 +54,7 @@ Both errors carry `progress`, which says how many entrants the drawing confirmed
 import { PrizerailCutoffError } from "prizerail"
 
 try {
-  await campaign.entries.send(entries)
+  await campaign.entries.send(entrants)
 } catch (error) {
   if (!(error instanceof PrizerailCutoffError)) throw error
   console.log(`${error.progress.sent} sent to ${error.progress.drawing.id}`)
