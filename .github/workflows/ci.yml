@@ -44,17 +44,22 @@ jobs:
         run: node -e 'require("./dist/index.js")'
 
       # An app that bundles the SDK into one file must not run the verify CLI
-      # at startup: the bundle's import.meta.url is the app's own entry point.
+      # at startup, in ESM or CommonJS output. The SDK imports verify-core.mjs,
+      # which the build cuts before the CLI.
       - name: Bundled app
         run: |
+          if grep -q "prizerail:cli" dist/verify-core.mjs; then echo "verify-core.mjs has the CLI"; exit 1; fi
           echo 'import { Prizerail } from "./dist/index.js"; console.log(typeof Prizerail)' > bundle-app.mjs
-          npx --yes esbuild@0.25.0 bundle-app.mjs --bundle --platform=node --format=esm --outfile=bundle-out.mjs --log-level=warning
-          test "$(node bundle-out.mjs)" = "function"
+          for format in esm cjs; do
+            npx --yes esbuild@0.25.0 bundle-app.mjs --bundle --platform=node --format=$format --outfile=bundle-$format.js --log-level=error
+            out="$(node bundle-$format.js)"
+            test "$out" = "function" || { echo "$format bundle printed: $out"; exit 1; }
+          done
 
       # The packed tarball is what npm users get, so check it has the CLI and the verify script.
       - name: Pack
         run: |
           npm pack --dry-run --json > pack.json
-          for f in dist/index.js dist/cli.js dist/verify-draw.mjs dist/verify-draw.d.mts README.md LICENSE; do
+          for f in dist/index.js dist/cli.js dist/verify-core.mjs dist/verify-draw.mjs dist/verify-draw.d.mts README.md LICENSE; do
             jq -e --arg f "$f" '.[0].files | map(.path) | index($f)' pack.json > /dev/null || { echo "missing $f"; exit 1; }
           done

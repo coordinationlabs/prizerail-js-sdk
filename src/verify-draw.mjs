@@ -774,14 +774,13 @@ async function main() {
   process.exit(failed ? 1 : 0);
 }
 
-// Run main() only when called as this script, not when imported. No
-// top-level await, so a CommonJS require() of the package can load this file.
-// The name check keeps an app that bundles this file into its own entry
-// point from running main() at startup.
-const isThisScript = /\/verify-draw\.mjs$/.test(
-  new URL(import.meta.url).pathname
-);
-if (isThisScript && typeof process !== "undefined" && process.argv?.[1]) {
+// Everything below runs the script from the command line. The prizerail
+// package's build cuts the file here for the copy the SDK imports, so an app
+// that bundles the SDK never contains it. This line is that marker:
+// prizerail:cli
+// Run main() only when called as a script, under any file name, not when
+// imported. No top-level await, so a CommonJS require() can load this file.
+if (typeof process !== "undefined" && process.argv?.[1]) {
   // argv[1] may go through a symlink (pnpm's node_modules), and
   // import.meta.url is the real path unless --preserve-symlinks-main is set,
   // so either form counts.
