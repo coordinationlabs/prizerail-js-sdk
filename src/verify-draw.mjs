@@ -780,25 +780,36 @@ async function main() {
 // prizerail:cli
 // Run main() only when called as a script, under any file name, not when
 // imported. No top-level await, so a CommonJS require() can load this file.
+// Started as a script, it must never exit 0 without checking the draw.
 if (typeof process !== "undefined" && process.argv?.[1]) {
-  // argv[1] may go through a symlink (pnpm's node_modules), and
-  // import.meta.url is the real path unless --preserve-symlinks-main is set,
-  // so either form counts.
   Promise.all([import("node:url"), import("node:fs")])
     .then(([{ pathToFileURL }, { realpathSync }]) => {
+      const here = import.meta.url;
       const arg = process.argv[1];
-      const scripts = [
-        pathToFileURL(arg).href,
-        pathToFileURL(realpathSync(arg)).href,
-      ];
-      if (scripts.includes(import.meta.url)) {
+      const isMain = () => {
+        // Deno, Bun and Node 24.2+ say so directly, even for a remote URL.
+        if (import.meta.main === true) return true;
+        // This file itself read from stdin (`node -`) or eval.
+        if (/\/\[eval\d*\]$/.test(here)) return true;
+        if (pathToFileURL(arg).href === here) return true;
+        // argv[1] may go through a symlink (pnpm's node_modules), and
+        // import.meta.url is the real path unless --preserve-symlinks-main.
+        try {
+          return pathToFileURL(realpathSync(arg)).href === here;
+        } catch {
+          return false;
+        }
+      };
+      if (isMain()) {
         main().catch(error => {
           console.error(error.message);
           process.exit(2);
         });
       }
     })
-    .catch(() => {
-      // Can't tell whether it was run as a script, so it wasn't.
+    .catch(error => {
+      // Couldn't tell how it was started. Say so, not exit 0 as if verified.
+      console.error(`Couldn't start the verifier: ${error.message}`);
+      process.exitCode = 2;
     });
 }

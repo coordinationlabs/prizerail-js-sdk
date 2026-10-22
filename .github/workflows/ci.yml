@@ -44,15 +44,17 @@ jobs:
         run: node -e 'require("./dist/index.js")'
 
       # An app that bundles the SDK into one file must not run the verify CLI
-      # at startup, in ESM or CommonJS output. The SDK imports verify-core.mjs,
-      # which the build cuts before the CLI.
+      # at startup. The SDK imports verify-core.mjs, which the build cuts
+      # before the CLI. The ESM bundle is the guard for that, since a CommonJS
+      # bundle has no import.meta. The .cjs one checks CommonJS loads at all.
       - name: Bundled app
         run: |
           if grep -q "prizerail:cli" dist/verify-core.mjs; then echo "verify-core.mjs has the CLI"; exit 1; fi
           echo 'import { Prizerail } from "./dist/index.js"; console.log(typeof Prizerail)' > bundle-app.mjs
           for format in esm cjs; do
-            npx --yes esbuild@0.25.0 bundle-app.mjs --bundle --platform=node --format=$format --outfile=bundle-$format.js --log-level=error
-            out="$(node bundle-$format.js)"
+            ext=$([ $format = cjs ] && echo cjs || echo mjs)
+            npx --yes esbuild@0.25.0 bundle-app.mjs --bundle --platform=node --format=$format --outfile=bundle.$ext --log-level=error
+            out="$(node bundle.$ext)"
             test "$out" = "function" || { echo "$format bundle printed: $out"; exit 1; }
           done
 
