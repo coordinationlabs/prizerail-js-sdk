@@ -11,7 +11,7 @@ The Prizerail SDK for JavaScript and TypeScript. Send entries, read results and 
 npm install prizerail
 ```
 
-The API is early (v0.x), so names can change between minor versions. 0.5.1 adds the `skipped` drawing status. 0.5.0 sends a `pr_sandbox_` key to https://sandbox.prizerail.com unless you pass `siteUrl` (0.4.0 did the same for the old `pr_test_` keys). 0.3.0 adds `entries.increment()`, 0.3.1 checks every event before sending any and lists only the drawings that took entries, and 0.3.2 and 0.3.3 check avatar URLs, names and the older `weight` up front too. 0.2.0 says `entries` where 0.1.0 said `weight`: an entrant is `{ entrantId, entries }`, and totals are `entrantCount` and `totalEntries`. The old names still work, marked deprecated. Each change is in the [changelog](https://docs.prizerail.com/changelog).
+The API is early (v0.x), so names can change between minor versions. 0.5.2 changes no code: it is the first release from the public repo, and links to it from npm. 0.5.1 adds the `skipped` drawing status. 0.5.0 sends a `pr_sandbox_` key to https://sandbox.prizerail.com unless you pass `siteUrl` (0.4.0 did the same for the old `pr_test_` keys). 0.3.0 adds `entries.increment()`, 0.3.1 checks every event before sending any and lists only the drawings that took entries, and 0.3.2 and 0.3.3 check avatar URLs, names and the older `weight` up front too. 0.2.0 says `entries` where 0.1.0 said `weight`: an entrant is `{ entrantId, entries }`, and totals are `entrantCount` and `totalEntries`. The old names still work, marked deprecated. Each change is in the [changelog](https://docs.prizerail.com/changelog).
 
 ## Send entries
 
