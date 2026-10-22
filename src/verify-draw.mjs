@@ -796,11 +796,18 @@ if (
       const here = import.meta.url;
       const arg = process.argv[1];
       const isMain = () => {
-        // Deno, Bun and recent Node 22 and 24 say so directly, even for a remote URL
-        // or stdin, so trust them and don't touch the file system.
-        if (typeof import.meta.main === "boolean") return import.meta.main;
-        // Older Node: this file itself read from stdin (`node -`) or eval.
-        if (/\/\[eval\d*\]$/.test(here)) return true;
+        // Deno, Bun and recent Node say true for the entry point, even for a
+        // remote URL.
+        if (import.meta.main === true) return true;
+        // Node from stdin (`node -`) or -e: the URL ends in a literal [eval],
+        // and Node 22.18+ reports main as false there. A real file's brackets
+        // are percent-encoded in Node. Deno doesn't encode them, and says true
+        // for stdin, so it's left out.
+        if (typeof Deno === "undefined" && /\/\[eval\d*\]$/.test(here)) {
+          return true;
+        }
+        // An importer: trust it, so Deno never asks to read the file system.
+        if (import.meta.main === false) return false;
         if (pathToFileURL(arg).href === here) return true;
         // argv[1] may go through a symlink (pnpm's node_modules), and
         // import.meta.url is the real path unless --preserve-symlinks-main.

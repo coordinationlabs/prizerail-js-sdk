@@ -43,6 +43,18 @@ jobs:
       - name: require()
         run: node -e 'require("./dist/index.js")'
 
+      # Run as a script, from a file, stdin or -e, the verifier must never
+      # exit 0 without checking a draw. With a missing proof it must fail.
+      - name: verify-draw.mjs never passes silently
+        run: |
+          set +e
+          node dist/verify-draw.mjs missing.json; file=$?
+          node - missing.json < dist/verify-draw.mjs; stdin=$?
+          node -e "$(cat dist/verify-draw.mjs)" missing.json; evald=$?
+          set -e
+          echo "file=$file stdin=$stdin eval=$evald"
+          [ "$file" -ne 0 ] && [ "$stdin" -ne 0 ] && [ "$evald" -ne 0 ]
+
       # An app that bundles the SDK into one file must not run the verify CLI
       # at startup. The SDK imports verify-core.mjs, which the build cuts
       # before the CLI. The ESM bundle is the guard for that, since a CommonJS
