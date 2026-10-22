@@ -465,7 +465,65 @@ describe("malformed responses", () => {
     );
     await expect(client(fetch).entries.list()).rejects.toMatchObject({
       code: "invalid_response",
+      detail: expect.stringContaining("no entrants list"),
     });
+  });
+
+  it("refuses older total names next to a current list", async () => {
+    const { fetch } = scripted(
+      page({
+        count: 1,
+        totalWeight: 4,
+        entrants: [{ entrantId: "a", entries: 4 }],
+      })
+    );
+    await expect(client(fetch).entries.list()).rejects.toMatchObject({
+      code: "invalid_response",
+      detail: expect.stringContaining("entrantCount"),
+    });
+  });
+
+  it("refuses a page with entrantCount but no totalEntries", async () => {
+    const { fetch } = scripted(page({ entrantCount: 0, entrants: [] }));
+    await expect(client(fetch).entries.list()).rejects.toMatchObject({
+      code: "invalid_response",
+      detail: expect.stringContaining("totalEntries"),
+    });
+  });
+
+  it("refuses an entrant row with weight and no entries", async () => {
+    const { fetch } = scripted(
+      page({
+        entrantCount: 1,
+        totalEntries: 4,
+        entrants: [{ entrantId: "a", weight: 4 }],
+      })
+    );
+    await expect(client(fetch).entries.list()).rejects.toMatchObject({
+      code: "invalid_response",
+      detail: expect.stringContaining("no valid id or entries"),
+    });
+  });
+
+  it("stops a send at the first batch in the older shape", async () => {
+    const old = () =>
+      json({
+        drawing: drawingRef("d1"),
+        added: 1000,
+        updated: 0,
+        unchanged: 0,
+        count: 1000,
+        totalWeight: 1000,
+      });
+    const { fetch, calls } = scripted(old(), old());
+    const ids = Array.from({ length: 2000 }, (_, i) => `e${i}`);
+    await expect(
+      client(fetch).entries.send(ids, { drawing: drawingRef("d1") })
+    ).rejects.toMatchObject({
+      code: "invalid_response",
+      detail: expect.stringContaining("0 entries were confirmed in drawing d1"),
+    });
+    expect(calls).toHaveLength(1);
   });
 });
 

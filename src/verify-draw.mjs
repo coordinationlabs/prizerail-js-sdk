@@ -774,13 +774,15 @@ async function main() {
   process.exit(failed ? 1 : 0);
 }
 
-// Run main() only when called as a script, not when imported.
+// Run main() only when called as a script, not when imported. No top-level
+// await, so a CommonJS require() of the package can load this file.
 if (typeof process !== "undefined" && process.argv?.[1]) {
-  const { pathToFileURL } = await import("node:url");
-  if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-    main().catch(error => {
-      console.error(error.message);
-      process.exit(2);
-    });
-  }
+  import("node:url").then(({ pathToFileURL }) => {
+    if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+      main().catch(error => {
+        console.error(error.message);
+        process.exit(2);
+      });
+    }
+  });
 }

@@ -11,7 +11,7 @@ The Prizerail SDK for JavaScript and TypeScript. Send entries, read results and 
 npm install prizerail
 ```
 
-Versions follow [semver](https://semver.org): within 1.x nothing is removed or renamed, and new features come in minor versions. Each release is in the [changelog](https://docs.prizerail.com/changelog).
+Versions follow [semver](https://semver.org): within 1.x nothing is removed or renamed, and new features come in minor versions. A status, such as a drawing's, can gain a new value in a minor version, so give a `switch` over one a default case. Each release is in the [changelog](https://docs.prizerail.com/changelog).
 
 ## Use it from your server
 

@@ -86,7 +86,13 @@ export type IncrementResult = {
  * a batch stored before its response was lost, then retried, counts as
  * unchanged. Reconcile with `entrantCount`, not with `added`.
  */
-export type SendResult = SendEntriesResponse & {
+export type SendResult = {
+  drawing: DrawingRef;
+  added: number;
+  updated: number;
+  unchanged: number;
+  entrantCount: number;
+  totalEntries: number;
   /** Entrants in the batches the drawing confirmed. */
   sent: number;
   batches: number;
@@ -183,7 +189,42 @@ function checkIncrementResponse(r: unknown) {
   ) {
     throw badResponse("The increment response has no valid drawing or counts.");
   }
-  return res as SendEntriesResponse & { duplicates?: number };
+  return res as {
+    drawing: DrawingRef;
+    added: number;
+    updated: number;
+    duplicates?: number;
+  };
+}
+
+/**
+ * A send batch's response, checked before its counts are added up, so a bad
+ * one stops the send there and says how much the drawing had confirmed.
+ */
+function checkSendResponse(r: unknown, progress: SendProgress) {
+  const res = r as {
+    drawing?: { id?: unknown };
+    added?: unknown;
+    updated?: unknown;
+    unchanged?: unknown;
+  } | null;
+  try {
+    if (
+      typeof res?.drawing?.id !== "string" ||
+      !isCount(res.added) ||
+      !isCount(res.updated) ||
+      !isCount(res.unchanged)
+    ) {
+      throw badResponse("The send response has no valid drawing or counts.");
+    }
+    totals(res as WireTotals);
+  } catch (error) {
+    const e = error as PrizerailError;
+    throw badResponse(
+      `${e.detail} ${progress.sent} entries were confirmed in drawing ${progress.drawing.id} before it. Check what it has before sending again.`
+    );
+  }
+  return res as SendEntriesResponse;
 }
 
 /**
@@ -401,7 +442,7 @@ export class EntriesClient {
         );
       }
       const batch = entries.slice(i, i + ENTRIES_PER_REQUEST);
-      const res = await this.campaign.http.request<SendEntriesResponse>(
+      const raw = await this.campaign.http.request<unknown>(
         "POST",
         this.campaign.path("/entries"),
         {
@@ -414,6 +455,7 @@ export class EntriesClient {
             ),
         }
       );
+      const res = checkSendResponse(raw, progress);
       if (res.drawing.id !== target.id) {
         throw new PrizerailDrawingChangedError({ ...progress }, res.drawing);
       }

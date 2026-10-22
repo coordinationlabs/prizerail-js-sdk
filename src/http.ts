@@ -96,7 +96,14 @@ function parseBody<T>(res: Response, text: string): T {
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 export class Http {
-  constructor(readonly options: HttpOptions) {}
+  readonly options: Omit<HttpOptions, "apiKey">;
+  // Private, so the key isn't in the types, JSON.stringify or a logged client.
+  readonly #apiKey: string | undefined;
+
+  constructor({ apiKey, ...options }: HttpOptions) {
+    this.options = options;
+    this.#apiKey = apiKey;
+  }
 
   url(path: string, query?: RequestOptions["query"]) {
     const url = new URL(path.replace(/^\//, ""), `${this.options.baseUrl}/`);
@@ -112,7 +119,8 @@ export class Http {
     path: string,
     { query, body, deadline, onDeadline, ...rest }: RequestOptions = {}
   ): Promise<T> {
-    const { apiKey, fetch, userAgent } = this.options;
+    const { fetch, userAgent } = this.options;
+    const apiKey = this.#apiKey;
     const maxRetries = rest.maxRetries ?? this.options.maxRetries;
     const timeoutMs = rest.timeoutMs ?? this.options.timeoutMs;
     if (!apiKey) {

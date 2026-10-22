@@ -171,8 +171,6 @@ export type SendEntriesResponse = {
   entrantCount: number;
   /** The drawing's total entries so far. */
   totalEntries: number;
-  /** Increment mode: events this campaign had already seen, so ignored. */
-  duplicates?: number;
 };
 
 export type SentEntrant = {
