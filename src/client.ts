@@ -59,12 +59,6 @@ export type SendOptions = {
 };
 
 /**
- * `entrantCount` and `totalEntries` are the drawing's totals after the last
- * batch. `added`, `updated` and `unchanged` sum what each batch reported, so
- * a batch stored before its response was lost, then retried, counts as
- * unchanged. Reconcile with `entrantCount`, not with `added`.
- */
-/**
  * What `entries.increment()` did. Its batches go to the drawing taking
  * entries when each arrives, so a cutoff mid-way splits them between
  * drawings, which is correct for events that happened either side of it.
@@ -86,6 +80,12 @@ export type IncrementResult = {
   drawings: DrawingRef[];
 };
 
+/**
+ * `entrantCount` and `totalEntries` are the drawing's totals after the last
+ * batch. `added`, `updated` and `unchanged` sum what each batch reported, so
+ * a batch stored before its response was lost, then retried, counts as
+ * unchanged. Reconcile with `entrantCount`, not with `added`.
+ */
 export type SendResult = SendEntriesResponse & {
   /** Entrants in the batches the drawing confirmed. */
   sent: number;
@@ -187,8 +187,8 @@ function checkIncrementResponse(r: unknown) {
 }
 
 /**
- * An entrant as the API takes it. The older `weight` is gone from 1.0.0, so
- * it's refused rather than sent, which would count the entrant once.
+ * An entrant as the API takes it. The API refuses the older `weight` in this
+ * body, so it's refused here, before any batch is sent.
  */
 function toWire(entrant: Entrant): Entrant {
   if (typeof entrant === "string") return entrant;
@@ -358,7 +358,7 @@ export class EntriesClient {
   /**
    * Sends entries to one drawing, in requests of 1,000, retrying 429s, 5xx
    * and network errors. Sending an entrant again before the cutoff only sets
-   * their weight, so a retry is safe, but a retry after the cutoff would go
+   * their entries, so a retry is safe, but a retry after the cutoff would go
    * to the next drawing. So the send is pinned to one drawing: it stops with
    * a PrizerailCutoffError rather than send or retry near its cutoff, and
    * with a PrizerailDrawingChangedError if a batch lands anywhere else.
