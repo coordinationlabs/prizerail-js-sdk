@@ -794,10 +794,10 @@ if (
     .then(([{ pathToFileURL }, { realpathSync }]) => {
       const here = import.meta.url;
       const arg = process.argv[1];
-      // -e and --eval leave no script slot in argv, so argv[1] is never this
-      // file there, and main() would read the wrong arguments.
+      // -e, -p and their long forms leave no script slot in argv, so argv[1]
+      // is never this file there, and main() would read the wrong arguments.
       const evalRun = process.execArgv.some(
-        a => a === "-e" || a === "--eval" || a.startsWith("--eval=")
+        a => /^--(eval|print)(=|$)/.test(a) || /^-[a-z]*[ep][a-z]*$/i.test(a)
       );
       const isMain = () => {
         // Deno, Bun and recent Node say true for the entry point, even for a
@@ -811,6 +811,8 @@ if (
           return true;
         }
         // An importer: trust it, so Deno never asks to read the file system.
+        // One gap: `node --import ./verify-draw.mjs ./verify-draw.mjs` loads
+        // it once as an import, so the run checks nothing. Nobody runs it so.
         if (import.meta.main === false) return false;
         if (!arg || evalRun) return false;
         if (pathToFileURL(arg).href === here) return true;

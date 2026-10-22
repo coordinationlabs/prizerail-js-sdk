@@ -5,7 +5,7 @@ The Prizerail SDK for JavaScript and TypeScript. Send entries, read results and 
 - Typed client for the [partner API](https://docs.prizerail.com/api/authentication), with paging and safe retries.
 - `verifyDraw`, the same checks as the public verify script, plus `wasEntered` to find someone in a locked list.
 - `npx prizerail verify` from the command line.
-- No dependencies. Node 20.19+ or 22.12+, with `import` or `require()`, Deno, Bun, and edge runtimes with `fetch` and WebCrypto.
+- No dependencies. Node 20.19+ or 22.12+, with `import` or `require()` (a TypeScript project that compiles to CommonJS needs `"module": "nodenext"`), Deno, Bun, and edge runtimes with `fetch` and WebCrypto.
 
 ```sh
 npm install prizerail
