@@ -11,7 +11,13 @@ The Prizerail SDK for JavaScript and TypeScript. Send entries, read results and 
 npm install prizerail
 ```
 
-The API is early (v0.x), so names can change between minor versions. 0.5.2 changes no code: it is the first release from the public repo, and links to it from npm. 0.5.1 adds the `skipped` drawing status. 0.5.0 sends a `pr_sandbox_` key to https://sandbox.prizerail.com unless you pass `siteUrl` (0.4.0 did the same for the old `pr_test_` keys). 0.3.0 adds `entries.increment()`, 0.3.1 checks every event before sending any and lists only the drawings that took entries, and 0.3.2 and 0.3.3 check avatar URLs, names and the older `weight` up front too. 0.2.0 says `entries` where 0.1.0 said `weight`: an entrant is `{ entrantId, entries }`, and totals are `entrantCount` and `totalEntries`. The old names still work, marked deprecated. Each change is in the [changelog](https://docs.prizerail.com/changelog).
+The API is early (v0.x), so names can change between minor versions. Each change is in the [changelog](https://docs.prizerail.com/changelog).
+
+## Use it from your server
+
+Call Prizerail from your backend, or a proxy you run, never from a website or a mobile app. The API key can send entries for every campaign under your account, and anything shipped to a browser or an app can be read out of it. Your app tells your server what a user did, and your server sends the entries. To show results in your app, read them on your server and pass them on, or read the public proof, which needs no key.
+
+The verify helpers (`verifyDraw`, `wasEntered` and `npx prizerail verify`) take no key, so they're safe to run anywhere.
 
 ## Send entries
 
@@ -148,8 +154,6 @@ new Prizerail({
 })
 ```
 
-Keep the API key on your server. It can send entries for every campaign under your account.
-
 ## Development
 
 ```sh
@@ -166,7 +170,7 @@ Issues and pull requests are welcome. For a security problem, email team@coordin
 
 ### Releasing
 
-1. Bump `version` in `package.json` and `VERSION` in `src/client.ts`, and add a line to the change list above.
+1. Bump `version` in `package.json` and `VERSION` in `src/client.ts`, and add the release to the [changelog](https://docs.prizerail.com/changelog).
 2. Merge to `main`.
 3. From an up-to-date `main`, run the checks and publish. `npm publish` builds `dist` first.
 
