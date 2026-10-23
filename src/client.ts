@@ -189,14 +189,12 @@ function checkIncrementResponse(r: unknown) {
 /** An entrant as the API takes it: `entries`, never the older `weight`. */
 function toWire(entrant: Entrant): Entrant {
   if (typeof entrant === "string") return entrant;
-  const { weight, ...rest } = entrant;
-  if (weight === undefined) return rest;
-  if (rest.entries !== undefined) {
+  if ((entrant as { weight?: unknown }).weight !== undefined) {
     throw new TypeError(
-      `Entrant ${rest.entrantId} has both entries and weight. Send entries.`
+      `Entrant ${entrant.entrantId}: use entries, not the older weight.`
     );
   }
-  return { ...rest, entries: weight };
+  return entrant;
 }
 
 /** Totals as the server may send them: current names, older names, or both. */
@@ -208,7 +206,7 @@ type WireTotals = {
 };
 
 /** An entrant row as the server may send it. */
-type WireEntrant = Omit<SentEntrant, "entries" | "weight"> & {
+type WireEntrant = Omit<SentEntrant, "entries"> & {
   entries?: number;
   weight?: number;
 };
@@ -235,15 +233,11 @@ function pick(r: WireTotals, current: keyof WireTotals, old: keyof WireTotals) {
   return value;
 }
 
-/** Both names for the totals, from whichever the server sent. */
+/** The totals under their current names, from whichever the server sent. */
 function totals(r: WireTotals) {
-  const entrantCount = pick(r, "entrantCount", "count");
-  const totalEntries = pick(r, "totalEntries", "totalWeight");
   return {
-    entrantCount,
-    totalEntries,
-    count: entrantCount,
-    totalWeight: totalEntries,
+    entrantCount: pick(r, "entrantCount", "count"),
+    totalEntries: pick(r, "totalEntries", "totalWeight"),
   };
 }
 
@@ -260,20 +254,19 @@ function normalizePage(
   if (!Array.isArray(rows)) {
     throw badResponse("The response has no entrants list.");
   }
-  const entrants = rows.map(e => {
-    const n = e.entries ?? e.weight;
+  const entrants = rows.map(({ weight, ...e }) => {
+    const n = e.entries ?? weight;
     if (!isCount(n) || n < 1 || typeof e.entrantId !== "string") {
       throw badResponse(
         "An entrant in the response has no valid id or entries."
       );
     }
-    return { ...e, entries: n, weight: n };
+    return { ...e, entries: n };
   });
   return {
     drawing: page.drawing,
     ...totals(page),
     entrants,
-    entries: entrants,
     next: page.next,
   };
 }
@@ -374,7 +367,7 @@ export class EntriesClient {
   /**
    * Sends entries to one drawing, in requests of 1,000, retrying 429s, 5xx
    * and network errors. Sending an entrant again before the cutoff only sets
-   * their weight, so a retry is safe, but a retry after the cutoff would go
+   * their entries, so a retry is safe, but a retry after the cutoff would go
    * to the next drawing. So the send is pinned to one drawing: it stops with
    * a PrizerailCutoffError rather than send or retry near its cutoff, and
    * with a PrizerailDrawingChangedError if a batch lands anywhere else.

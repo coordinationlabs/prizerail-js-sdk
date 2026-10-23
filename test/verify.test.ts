@@ -27,7 +27,6 @@ describe("wasEntered", () => {
     expect(wasEntered("bob", rows)).toEqual({
       index: 1,
       entries: 3,
-      weight: 3,
     });
     expect(wasEntered("carol", rows)).toBeNull();
   });

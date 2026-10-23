@@ -284,7 +284,7 @@ describe("entries.send", () => {
       drawing: { id: "d1" },
       sent: 2500,
       added: 2500,
-      count: 2500,
+      entrantCount: 2500,
       batches: 3,
     });
     expect(calls[0].url.searchParams.get("limit")).toBe("1");
@@ -377,51 +377,43 @@ describe("entries.send", () => {
 });
 
 describe("entries and the older weight", () => {
-  it("sends entries, and maps a deprecated weight to entries", async () => {
-    const { fetch, calls } = scripted(accepted("d1", 3, 3));
-    await client(fetch).entries.send(
-      ["a", { entrantId: "b", entries: 5 }, { entrantId: "c", weight: 2 }],
-      { drawing: drawingRef("d1") }
-    );
+  it("sends entries", async () => {
+    const { fetch, calls } = scripted(accepted("d1", 2, 2));
+    await client(fetch).entries.send(["a", { entrantId: "b", entries: 5 }], {
+      drawing: drawingRef("d1"),
+    });
     expect(calls[0].body).toEqual({
-      entrants: [
-        "a",
-        { entrantId: "b", entries: 5 },
-        { entrantId: "c", entries: 2 },
-      ],
+      entrants: ["a", { entrantId: "b", entries: 5 }],
     });
   });
 
-  it("refuses an entrant with both entries and weight", async () => {
+  it("refuses an entrant with the older weight", async () => {
     const { fetch, calls } = scripted();
     await expect(
-      client(fetch).entries.send([{ entrantId: "x", entries: 1, weight: 1 }], {
+      client(fetch).entries.send([{ entrantId: "x", weight: 1 } as never], {
         drawing: drawingRef("d1"),
       })
-    ).rejects.toThrow("both entries and weight");
+    ).rejects.toThrow("not the older weight");
     expect(calls).toHaveLength(0);
   });
 
-  it("gives both names for totals, whichever the server sent", async () => {
+  it("gives totals under the current names, whichever the server sent", async () => {
     const { fetch } = scripted(
       json({
         drawing: drawingRef("d1"),
         added: 1,
         updated: 0,
         unchanged: 0,
-        entrantCount: 7,
-        totalEntries: 70,
+        count: 7,
+        totalWeight: 70,
       })
     );
     const r = await client(fetch).entries.send(["a"], {
       drawing: drawingRef("d1"),
     });
-    expect(r).toMatchObject({
-      entrantCount: 7,
-      totalEntries: 70,
-      count: 7,
-      totalWeight: 70,
-    });
+    expect(r).toMatchObject({ entrantCount: 7, totalEntries: 70 });
+    expect(r).not.toHaveProperty("count");
+    expect(r).not.toHaveProperty("totalWeight");
   });
 
   it("reads a page from an older server", async () => {
@@ -436,11 +428,9 @@ describe("entries and the older weight", () => {
     );
     const page = await client(fetch).entries.list();
     expect(page).toMatchObject({ entrantCount: 1, totalEntries: 4 });
-    expect(page.entrants[0]).toMatchObject({
-      entrantId: "a",
-      entries: 4,
-      weight: 4,
-    });
+    expect(page.entrants[0]).toMatchObject({ entrantId: "a", entries: 4 });
+    expect(page.entrants[0]).not.toHaveProperty("weight");
+    expect(page).not.toHaveProperty("entries");
   });
 });
 

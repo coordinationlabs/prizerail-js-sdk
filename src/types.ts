@@ -138,16 +138,11 @@ export type Entrant =
       entrantId: string;
       /** Their number of entries, a whole number from 1. Leave it out and it's 1. */
       entries?: number;
-      /** @deprecated Use `entries`. Still sent as `entries`. */
-      weight?: number;
       /** Up to 40 characters. */
       displayName?: string;
       /** https, up to 2,048 characters. */
       avatarUrl?: string;
     };
-
-/** @deprecated Use `Entrant`. */
-export type Entry = Entrant;
 
 /**
  * One event that earns an entrant entries, for `entries.increment()`. The
@@ -176,10 +171,6 @@ export type SendEntriesResponse = {
   entrantCount: number;
   /** The drawing's total entries so far. */
   totalEntries: number;
-  /** @deprecated Use `entrantCount`. */
-  count: number;
-  /** @deprecated Use `totalEntries`. */
-  totalWeight: number;
   /** Increment mode: events this campaign had already seen, so ignored. */
   duplicates?: number;
 };
@@ -188,8 +179,6 @@ export type SentEntrant = {
   entrantId: string;
   /** Their number of entries. */
   entries: number;
-  /** @deprecated Use `entries`. */
-  weight: number;
   displayName: string | null;
   avatarUrl: string | null;
   /** Place in the locked list. Null until the cutoff. */
@@ -197,21 +186,12 @@ export type SentEntrant = {
   receivedAt: string;
 };
 
-/** @deprecated Use `SentEntrant`. */
-export type SentEntry = SentEntrant;
-
 export type EntriesPage = {
   drawing: DrawingRef & { status: DrawingStatus };
   entrantCount: number;
   totalEntries: number;
   /** In arrival order, the order the list locks in. */
   entrants: SentEntrant[];
-  /** @deprecated Use `entrantCount`. */
-  count: number;
-  /** @deprecated Use `totalEntries`. */
-  totalWeight: number;
-  /** @deprecated Use `entrants`, the same list. */
-  entries: SentEntrant[];
   /** Pass as `after` for the next page. Null on the last. */
   next: string | null;
 };
