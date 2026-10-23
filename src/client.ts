@@ -59,12 +59,6 @@ export type SendOptions = {
 };
 
 /**
- * `entrantCount` and `totalEntries` are the drawing's totals after the last
- * batch. `added`, `updated` and `unchanged` sum what each batch reported, so
- * a batch stored before its response was lost, then retried, counts as
- * unchanged. Reconcile with `entrantCount`, not with `added`.
- */
-/**
  * What `entries.increment()` did. Its batches go to the drawing taking
  * entries when each arrives, so a cutoff mid-way splits them between
  * drawings, which is correct for events that happened either side of it.
@@ -86,6 +80,12 @@ export type IncrementResult = {
   drawings: DrawingRef[];
 };
 
+/**
+ * `entrantCount` and `totalEntries` are the drawing's totals after the last
+ * batch. `added`, `updated` and `unchanged` sum what each batch reported, so
+ * a batch stored before its response was lost, then retried, counts as
+ * unchanged. Reconcile with `entrantCount`, not with `added`.
+ */
 export type SendResult = SendEntriesResponse & {
   /** Entrants in the batches the drawing confirmed. */
   sent: number;

@@ -11,7 +11,7 @@ The Prizerail SDK for JavaScript and TypeScript. Send entries, read results and 
 npm install prizerail
 ```
 
-The API follows semantic versioning from 1.0.0: a breaking change only comes in a new major version. 1.0.0 drops the names deprecated in 0.2.0: send `entries`, not `weight`, and read `entrantCount`, `totalEntries` and `entrants`, not `count`, `totalWeight` and `entries`. Each change is in the [changelog](https://docs.prizerail.com/changelog).
+The API follows semantic versioning from 1.0.0: a breaking change only comes in a new major version. 1.0.0 drops the names deprecated in 0.2.0. Send `entries`, not `weight`. Read `entrantCount` and `totalEntries`, not `count` and `totalWeight`, and a page's `entrants`, not its `entries` list. An entrant row and `wasEntered()` give `entries`, not `weight`. The `Entry` and `SentEntry` types are now `Entrant` and `SentEntrant`. Each change is in the [changelog](https://docs.prizerail.com/changelog).
 
 ## Use it from your server
 
