@@ -142,6 +142,17 @@ A slug is looked up on www.prizerail.com. For a draw from a sandbox campaign, ad
 
 It exits 0 when every check passes, 1 when one fails, and 2 when the proof can't be read.
 
+## Check an integration
+
+With your key in `PRIZERAIL_API_KEY`, `check` reads a campaign and says whether the integration is set up right: the key and its environment, that the campaign is active with a drawing taking entries, and that the entrant ids and entries it has look right. Ids that read as an email, a username or a plain user id fail, since every locked list is published, hashed.
+
+```sh
+npx prizerail check your-campaign
+npx prizerail check your-campaign --draw   # sandbox only: draw now, then verify the result
+```
+
+A `pr_sandbox_` key checks the sandbox and a `pr_prod_` key production. It exits 0 when nothing failed. From code, `checkCampaign(campaign, { draw })` returns the same checks.
+
 ## Options
 
 ```ts

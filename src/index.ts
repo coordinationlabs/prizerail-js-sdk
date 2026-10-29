@@ -1,4 +1,12 @@
 export {
+  type CheckOptions,
+  type CheckResult,
+  checkCampaign,
+  checkEntrantIds,
+  checkEntries,
+  idShape,
+} from "./check.js";
+export {
   CampaignClient,
   DrawingsClient,
   ENTRIES_PER_REQUEST,
