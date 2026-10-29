@@ -100,9 +100,16 @@ describe("idShape", () => {
     expect(idShape("V1StGXR8_Z5jdHi6B-myT")).toBe("opaque");
     expect(idShape("cus_Nx6v2dG9mLk8Qa")).toBe("opaque");
     expect(idShape("clh3k2x9a0000qzrmn831i7rn")).toBe("opaque");
+    // Random ids with no digit, or lowercase with digits inside.
+    expect(idShape("XkjdPqLmNvBtRyUeWzAaBbCcDdEe")).toBe("opaque");
+    expect(idShape("VStGXRZjdHiBmyTqwErtyU")).toBe("opaque");
+    expect(idShape("usr_k3j9d8s7f6g5h4j3")).toBe("opaque");
+    expect(idShape("af3a9b2c1d4e5f6a")).toBe("opaque");
+    expect(idShape("wmxkjhdfgtrqpalzvbnmsjdu")).toBe("opaque");
     // Handles with a year are still handles.
     expect(idShape("ada_lovelace_1988")).toBe("username");
     expect(idShape("john.doe.1990")).toBe("username");
+    expect(idShape("jsmith42")).toBe("username");
   });
 });
 
@@ -176,7 +183,7 @@ describe("checkCampaign", () => {
     const { fetch } = scripted(json({ error: "unauthorized" }, 401));
     const c = new Prizerail({
       apiKey: "pr_sandbox_x",
-      siteUrl: "https://www.pr.test",
+      siteUrl: "https://www.prizerail.com",
       fetch,
     }).campaign("demo");
     const result = await checkCampaign(c);
@@ -313,6 +320,92 @@ describe("checkCampaign", () => {
       "✓ A draw runs now",
       "✗ Its proof verifies",
     ]);
+  });
+
+  it("says the draw didn't run when the request got no answer and the drawing is still open", async () => {
+    const entrants = [entrant(HEX)];
+    const { fetch } = scripted(
+      json(campaign()),
+      entriesPage(entrants),
+      entriesPage(entrants),
+      new TypeError("fetch failed"),
+      json({
+        drawing: {
+          id: "d1",
+          status: "open",
+          needsAttention: null,
+          winners: [],
+        },
+      })
+    );
+    const result = await checkCampaign(client(fetch), {
+      draw: true,
+      pollMs: 1,
+    });
+    expect(result.checks.at(-1)?.detail).toContain("didn't run");
+  });
+
+  it("verifies a settled drawing that is flagged for staff, with a note", async () => {
+    const entrants = [entrant(HEX)];
+    const { fetch } = scripted(
+      json(campaign()),
+      entriesPage(entrants),
+      entriesPage(entrants),
+      json({
+        drawing: {
+          id: "d1",
+          status: "settled",
+          needsAttention: "Campaign has no payout address",
+          winners: [{ position: 0, winner: HEX }],
+        },
+      }),
+      json({
+        format: "prizerail-draw-proof/3",
+        campaign: { id: "c", name: "Demo" },
+        drawing: { id: "d1", number: 1, drawAt: inAnHour() },
+      })
+    );
+    const result = await checkCampaign(client(fetch), {
+      draw: true,
+      pollMs: 1,
+    });
+    expect(labels(result.checks).slice(-3)).toEqual([
+      "✓ A draw runs now",
+      "i The drawing is flagged for staff",
+      "✗ Its proof verifies",
+    ]);
+  });
+
+  it("keeps the checks that passed when a later read throws", async () => {
+    const { fetch } = scripted(
+      json(campaign()),
+      json({ error: "internal" }, 503),
+      json({ error: "internal" }, 503),
+      json({ error: "internal" }, 503),
+      json({ error: "internal" }, 503),
+      json({ error: "internal" }, 503)
+    );
+    const c = new Prizerail({
+      apiKey: "pr_sandbox_x",
+      siteUrl: "https://sandbox.pr.test",
+      fetch,
+      maxRetries: 0,
+    }).campaign("demo");
+    const result = await checkCampaign(c);
+    expect(labels(result.checks)).toEqual([
+      "✓ The key works at https://sandbox.pr.test",
+      '✓ Campaign "Demo" is active',
+      "✓ A drawing is taking entries",
+      "✗ The check finished",
+    ]);
+  });
+
+  it("gives the plain key message on a site that isn't prizerail.com", async () => {
+    const { fetch } = scripted(json({ error: "unauthorized" }, 401));
+    const result = await checkCampaign(client(fetch));
+    expect(result.checks[0].detail).toContain(
+      "Unknown or revoked key for this site"
+    );
   });
 
   it("draws, polls until settled, and verifies the proof", async () => {

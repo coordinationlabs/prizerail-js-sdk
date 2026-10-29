@@ -86,15 +86,13 @@ export function idShape(id: string): IdShape {
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
   )
     return "uuid";
-  // Hex of 32 or more characters is a hash or a key-sized random id.
-  if (/^(0x)?[0-9a-f]{32,}$/i.test(id)) return "opaque";
-  // Mixed case with a digit is a generated id (nanoid, CUID, a prefixed
-  // random id like cus_Nx6v2dG9mLk8Qa), never a handle someone typed.
-  if (id.length >= 16 && /[a-z]/.test(id) && /[A-Z]/.test(id) && /\d/.test(id))
-    return "opaque";
+  // Hex of 16 or more characters is a hash, or a 64-bit or wider random id.
+  if (/^(0x)?[0-9a-f]{16,}$/i.test(id)) return "opaque";
+  // Mixed case this long is a generated id (nanoid, a Firebase UID, a
+  // prefixed random id like cus_Nx6v2dG9mLk8Qa), never a handle someone typed.
+  if (id.length >= 16 && /[a-z]/.test(id) && /[A-Z]/.test(id)) return "opaque";
   // Base64 or similar of 21 characters or more, a nanoid's length, with
-  // both letters and digits. All-letter strings this long are rare in
-  // random ids and common in names, so they go on to the username test.
+  // both letters and digits.
   if (/^[A-Za-z0-9_\-+/=]{21,}$/.test(id) && /\d/.test(id) && /[a-z]/i.test(id))
     return "opaque";
   if (id.length < 16) {
@@ -102,9 +100,13 @@ export function idShape(id: string): IdShape {
     if (/^[0-9a-f]+$/i.test(id)) return "short";
     return /^[a-z][a-z0-9_.-]*$/i.test(id) ? "username" : "short";
   }
-  // A word with separators, lowercase, reads as a handle even with a year
-  // on the end: ada_lovelace_1988. Anything else this long is opaque.
-  return /^[a-z][a-z0-9_.-]*$/i.test(id) ? "username" : "opaque";
+  // A handle reads as words: letters with separators, and at most a short
+  // run of digits on the end, as in ada_lovelace_1988. One long word with
+  // no separators (a cuid2) or digits inside it (usr_k3j9d8s7f6g5h4j3) is a
+  // generated id.
+  const words = /^[a-z]+(?:[_.-][a-z]+)*(?:[_.-]?\d{1,4})?$/i.test(id);
+  const oneLongWord = /^[a-z]{20,}$/i.test(id);
+  return words && !oneLongWord ? "username" : "opaque";
 }
 
 /** True when the numeric ids run like a counter: 1041, 1042, 1043. */
@@ -238,9 +240,12 @@ export function keyFailure(
   if (!(error instanceof PrizerailError)) return null;
   if (error.status === 401) {
     const sandboxKey = apiKey?.trim().startsWith("pr_sandbox_");
-    const sandboxSite = /\/\/sandbox\./.test(siteUrl);
-    const mismatch =
-      sandboxKey && !sandboxSite
+    const sandboxSite = siteUrl === "https://sandbox.prizerail.com";
+    const prizerailSite =
+      sandboxSite || siteUrl === "https://www.prizerail.com";
+    const mismatch = !prizerailSite
+      ? "Unknown or revoked key for this site."
+      : sandboxKey && !sandboxSite
         ? "This is a pr_sandbox_ key, and the site isn't the sandbox. Sandbox keys only work at https://sandbox.prizerail.com."
         : !sandboxKey && sandboxSite
           ? "This isn't a pr_sandbox_ key, and the site is the sandbox. Production keys only work at https://www.prizerail.com."
@@ -302,6 +307,30 @@ export async function checkCampaign(
     return done();
   }
   checks.push(pass(`The key works at ${siteUrl}`));
+  try {
+    return await checkRest(campaign, info, checks, options, now, done);
+  } catch (error) {
+    // A read that failed part-way keeps the checks that passed.
+    checks.push(
+      fail(
+        "The check finished",
+        error instanceof Error ? error.message : String(error)
+      )
+    );
+    return done({ campaign: info });
+  }
+}
+
+async function checkRest(
+  campaign: CampaignClient,
+  info: Campaign,
+  checks: Check[],
+  options: CheckOptions,
+  now: () => number,
+  done: (extra?: Partial<CheckResult>) => CheckResult
+): Promise<CheckResult> {
+  const { siteUrl } = campaign.prizerail;
+  void siteUrl;
   checks.push(
     info.status === "active"
       ? pass(`Campaign "${info.name}" is active`)
@@ -374,28 +403,43 @@ export async function checkCampaign(
       );
       return done({ campaign: info });
     }
-    if (error instanceof PrizerailError && error.status === 0) {
-      // No answer, but the route may well have run: the drawing's status
-      // says, so read it rather than call the draw failed.
-      drawing = await campaign.drawings.get(open.id);
-    } else if (error instanceof PrizerailError) {
-      checks.push(fail("A draw runs now", error.message));
-      return done({ campaign: info });
-    } else {
+    const unanswered =
+      error instanceof PrizerailError &&
+      (error.status === 0 || error.code === "invalid_response");
+    if (!unanswered) {
+      if (error instanceof PrizerailError) {
+        checks.push(fail("A draw runs now", error.message));
+        return done({ campaign: info });
+      }
       throw error;
+    }
+    // No usable answer, but the route may well have run: the drawing's
+    // status says. Draw now moves the cutoff before anything else, so a
+    // drawing still open didn't run.
+    drawing = await campaign.drawings.get(open.id);
+    if (drawing.status === "open") {
+      checks.push(
+        fail(
+          "A draw runs now",
+          `The draw request got no answer (${error.message}) and drawing ${open.id} is still open, so it didn't run. Run the check again.`
+        )
+      );
+      return done({ campaign: info, drawing });
     }
   }
   const running = (d: Drawing) =>
     d.status === "locked" || d.status === "entropy_requested";
   const deadline = now() + DRAW_WAIT_MS;
-  while (
-    running(drawing) &&
-    drawing.needsAttention === null &&
-    now() < deadline
-  ) {
+  let timedOut = false;
+  while (running(drawing) && drawing.needsAttention === null) {
+    if (now() >= deadline) {
+      timedOut = true;
+      break;
+    }
     await sleep(options.pollMs ?? 5_000);
     drawing = await campaign.drawings.get(drawing.id);
   }
+  const final = drawing.status === "settled" || drawing.status === "paid";
   if (drawing.status === "skipped") {
     checks.push(
       fail(
@@ -405,7 +449,7 @@ export async function checkCampaign(
     );
     return done({ campaign: info, drawing });
   }
-  if (drawing.needsAttention !== null) {
+  if (!final && drawing.needsAttention !== null) {
     checks.push(
       fail(
         "A draw runs now",
@@ -414,11 +458,13 @@ export async function checkCampaign(
     );
     return done({ campaign: info, drawing });
   }
-  if (drawing.status !== "settled" && drawing.status !== "paid") {
+  if (!final) {
     checks.push(
       fail(
         "A draw runs now",
-        `Drawing ${drawing.id} is still ${drawing.status} after ${DRAW_WAIT_MS / 60_000} minutes. Read it again with GET /drawings/${drawing.id}.`
+        timedOut
+          ? `Drawing ${drawing.id} is still ${drawing.status} after ${DRAW_WAIT_MS / 60_000} minutes. Read it again with GET /drawings/${drawing.id}.`
+          : `Drawing ${drawing.id} is ${drawing.status}, so it isn't drawing. Read it with GET /drawings/${drawing.id}.`
       )
     );
     return done({ campaign: info, drawing });
@@ -429,6 +475,14 @@ export async function checkCampaign(
       `Drawing ${drawing.id} is ${drawing.status} with ${n(drawing.winners.length)} winner${drawing.winners.length === 1 ? "" : "s"}`
     )
   );
+  if (drawing.needsAttention !== null) {
+    // Settled, so the winners are final and the proof stands. The flag is
+    // about what comes after, such as a sandbox campaign with no payout
+    // wallet, which is the normal sandbox state.
+    checks.push(
+      note("The drawing is flagged for staff", drawing.needsAttention)
+    );
+  }
   const result = await campaign.drawings.verify(drawing.id);
   const failed = result.checks.filter(c => c.ok === false);
   checks.push(
