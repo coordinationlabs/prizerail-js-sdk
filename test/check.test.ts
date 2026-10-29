@@ -94,6 +94,8 @@ describe("idShape", () => {
     expect(idShape("ada@example.com")).toBe("email");
     expect(idShape("ada_lovelace")).toBe("username");
     expect(idShape("1042")).toBe("number");
+    expect(idShape("customer00000001")).toBe("number");
+    expect(idShape("user_1042")).toBe("number");
     expect(idShape("3f2a9c1e-5b7d-4e8f-9a0b-1c2d3e4f5a6b")).toBe("uuid");
     expect(idShape("a1b2c3")).toBe("short");
     // Generated ids a partner stores: nanoid, CUID, prefixed random ids.
@@ -119,6 +121,13 @@ describe("idShape", () => {
 describe("looksSequential", () => {
   it("spots a counter and ignores spread-out numbers", () => {
     expect(looksSequential(["1041", "1042", "1043", "1045"])).toBe(true);
+    expect(
+      looksSequential([
+        "customer00000001",
+        "customer00000002",
+        "customer00000003",
+      ])
+    ).toBe(true);
     expect(looksSequential(["8812", "55120", "3", "900001"])).toBe(false);
     expect(looksSequential(["1", "2"])).toBe(false);
   });

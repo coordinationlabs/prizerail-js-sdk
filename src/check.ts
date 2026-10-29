@@ -84,6 +84,10 @@ export function idShape(id: string): IdShape {
   // A space or a letter beyond ASCII is a person's name, never a generated id.
   if (/\s/.test(id) || /[^\x00-\x7f]/.test(id)) return "username";
   if (/^\d+$/.test(id)) return "number";
+  // A word and then only digits is a labelled counter: customer00000001,
+  // user_1042. The label hides nothing, and the number is guessable.
+  if (/^[a-z]+[_.-]?\d{3,}$/i.test(id) && !/^[0-9a-f]+$/i.test(id))
+    return "number";
   if (
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
   )
@@ -117,10 +121,14 @@ export function idShape(id: string): IdShape {
   return words && !oneLongWord ? "username" : "opaque";
 }
 
-/** True when the numeric ids run like a counter: 1041, 1042, 1043. */
+/**
+ * True when the ids' numbers run like a counter: 1041, 1042, 1043, or
+ * customer00000001, customer00000002.
+ */
 export function looksSequential(ids: string[]): boolean {
   const nums = ids
-    .filter(id => /^\d{1,15}$/.test(id))
+    .map(id => id.match(/(\d{1,15})$/)?.[1])
+    .filter((n): n is string => n !== undefined)
     .map(Number)
     .sort((a, b) => a - b);
   if (nums.length < 3) return false;
