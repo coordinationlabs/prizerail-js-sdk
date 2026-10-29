@@ -1,7 +1,7 @@
 import type { CampaignClient } from "./client.js";
 import { PrizerailError } from "./errors.js";
 import type { Campaign, Drawing, SentEntrant } from "./types.js";
-import type { Check } from "./verify.js";
+import type { Check, VerifyResult } from "./verify.js";
 
 export type { Check };
 
@@ -82,7 +82,10 @@ export type IdShape =
 export function idShape(id: string): IdShape {
   if (id.includes("@")) return "email";
   // A space or a letter beyond ASCII is a person's name, never a generated id.
-  if (/\s/.test(id) || /[^\x00-\x7f]/.test(id)) return "username";
+  if (/\s/.test(id) || /[^\x20-\x7e]/.test(id)) return "username";
+  // A title-cased handle with a year: Ada_Lovelace_1988. Words only, with
+  // a separator, and digits only on the end.
+  if (/^[A-Za-z]+(?:[_.-][A-Za-z]+)+[_.-]?\d{1,4}$/.test(id)) return "username";
   if (/^\d+$/.test(id)) return "number";
   // A word and then only digits is a labelled counter: customer00000001,
   // user_1042. The label hides nothing, and the number is guessable.
@@ -501,7 +504,20 @@ async function checkRest(
       note("The drawing is flagged for staff", drawing.needsAttention)
     );
   }
-  const result = await campaign.drawings.verify(drawing.id);
+  let result: VerifyResult;
+  try {
+    result = await campaign.drawings.verify(drawing.id);
+  } catch (error) {
+    // The entrant list is read page by page with no retries, so a blip
+    // here is reported with the draw kept, not thrown over it.
+    checks.push(
+      fail(
+        "Its proof verifies",
+        `${error instanceof Error ? error.message : String(error)}. The draw ran: read ${campaign.drawings.proofUrl(drawing.id)}, or run \`npx prizerail verify ${campaign.slug} ${drawing.id}\` again.`
+      )
+    );
+    return done({ campaign: info, drawing });
+  }
   const failed = result.checks.filter(c => c.ok === false);
   checks.push(
     failed.length === 0

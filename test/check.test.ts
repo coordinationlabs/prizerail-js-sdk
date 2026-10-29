@@ -112,6 +112,7 @@ describe("idShape", () => {
     expect(idShape("ada_lovelace_1988")).toBe("username");
     expect(idShape("john.doe.1990")).toBe("username");
     expect(idShape("jsmith42")).toBe("username");
+    expect(idShape("Ada_Lovelace_1988")).toBe("username");
     // Names, with spaces or letters beyond ASCII, whatever their length.
     expect(idShape("Christopher Johnson")).toBe("username");
     expect(idShape("josé.garcía")).toBe("username");
@@ -456,6 +457,46 @@ describe("checkCampaign", () => {
     expect(result.checks[0].detail).toContain(
       "Unknown or revoked key for this site"
     );
+  });
+
+  it("keeps the draw when the entrant list can't be read during verification", async () => {
+    const entrants = [entrant(HEX)];
+    const { fetch } = scripted(
+      json(campaign()),
+      entriesPage(entrants),
+      entriesPage(entrants),
+      json({
+        drawing: {
+          id: "d1",
+          status: "settled",
+          needsAttention: null,
+          winners: [{ position: 0, winner: HEX }],
+        },
+      }),
+      json({
+        format: "prizerail-draw-proof/3",
+        campaign: { id: "c", name: "Demo" },
+        drawing: { id: "d1", number: 1, drawAt: inAnHour() },
+        entrantList: {
+          url: "entrants.json",
+          root: HEX,
+          count: 1,
+          totalWeight: 1,
+          winnersRequested: 1,
+          lockedAt: null,
+        },
+      }),
+      new TypeError("fetch failed")
+    );
+    const result = await checkCampaign(client(fetch), {
+      draw: true,
+      pollMs: 1,
+    });
+    expect(labels(result.checks).slice(-2)).toEqual([
+      "✓ A draw runs now",
+      "✗ Its proof verifies",
+    ]);
+    expect(result.checks.at(-1)?.detail).toContain("The draw ran");
   });
 
   it("draws, polls until settled, and verifies the proof", async () => {
