@@ -96,7 +96,13 @@ A campaign's official rules can narrow these. Read them from the partner, and po
 Set mode, from a job that runs before each cutoff:
 
 ```ts
-import { Prizerail, PrizerailCutoffError, hashEntrant, type Entrant } from "prizerail"
+import {
+  Prizerail,
+  PrizerailCutoffError,
+  PrizerailDrawingChangedError,
+  hashEntrant,
+  type Entrant,
+} from "prizerail"
 
 const campaign = new Prizerail({ apiKey: process.env.PRIZERAIL_API_KEY }).campaign(
   process.env.PRIZERAIL_CAMPAIGN!
@@ -114,8 +120,12 @@ export async function sendTodaysEntries() {
     const res = await campaign.entries.send(entrants)
     return { drawingId: res.drawing.id, sent: res.sent, entrantCount: res.entrantCount }
   } catch (error) {
-    if (error instanceof PrizerailCutoffError) {
-      // error.progress.sent entrants were confirmed. Check the rest with entries.list().
+    if (
+      error instanceof PrizerailCutoffError ||
+      error instanceof PrizerailDrawingChangedError
+    ) {
+      // Both carry progress: error.progress.sent entrants were confirmed in
+      // error.progress.drawing. Check the rest with entries.list().
       throw new Error(`${error.progress.sent} sent to ${error.progress.drawing.id}: ${error.detail}`)
     }
     throw error
