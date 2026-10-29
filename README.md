@@ -153,6 +153,10 @@ npx prizerail check your-campaign --draw   # sandbox only: draw now, then verify
 
 A `pr_sandbox_` key checks the sandbox and a `pr_prod_` key production. It exits 0 when nothing failed. From code, `checkCampaign(campaign, { draw })` returns the same checks.
 
+## Skills for coding agents
+
+`plugins/prizerail` is a Claude Code plugin with three skills: integrate Prizerail into an app, check an integration with `prizerail check`, and look up or verify draws. Install it with `/plugin marketplace add coordinationlabs/prizerail-js-sdk` then `/plugin install prizerail@prizerail`. The same skills are served as files at [docs.prizerail.com/ai/assistants](https://docs.prizerail.com/ai/assistants) for other agents.
+
 ## Options
 
 ```ts

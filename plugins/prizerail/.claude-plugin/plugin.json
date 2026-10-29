@@ -1,0 +1,14 @@
+{
+  "name": "prizerail",
+  "version": "1.1.0",
+  "description": "Integrate Prizerail prize draws into an app, check an integration end to end, and look up or verify draws.",
+  "author": {
+    "name": "Prizerail",
+    "email": "team@coordinationlabs.com",
+    "url": "https://www.prizerail.com"
+  },
+  "homepage": "https://docs.prizerail.com/ai/assistants",
+  "repository": "https://github.com/coordinationlabs/prizerail-js-sdk",
+  "license": "MIT",
+  "keywords": ["prizerail", "sweepstakes", "prize draw", "verifiable"]
+}
