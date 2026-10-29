@@ -1,0 +1,21 @@
+{
+  "name": "prizerail",
+  "owner": {
+    "name": "Prizerail",
+    "email": "team@coordinationlabs.com"
+  },
+  "metadata": {
+    "description": "Skills for building on Prizerail: integrate, check, and verify draws.",
+    "version": "1.1.0"
+  },
+  "plugins": [
+    {
+      "name": "prizerail",
+      "source": "./plugins/prizerail",
+      "description": "Integrate Prizerail prize draws into an app, check an integration end to end, and look up or verify draws.",
+      "version": "1.1.0",
+      "category": "development",
+      "keywords": ["prizerail", "sweepstakes", "prize draw"]
+    }
+  ]
+}
