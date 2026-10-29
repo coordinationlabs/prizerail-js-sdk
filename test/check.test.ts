@@ -108,6 +108,12 @@ describe("idShape", () => {
     expect(idShape("usr_k3j9d8s7f6g5h4j3")).toBe("opaque");
     expect(idShape("af3a9b2c1d4e5f6a")).toBe("opaque");
     expect(idShape("wmxkjhdfgtrqpalzvbnmsjdu")).toBe("opaque");
+    // Prefixed random ids whose random part has no digit, or digits on the end.
+    expect(idShape("cus_JdgMYmWdQaaAYv")).toBe("opaque");
+    expect(idShape("cus_NffrFeUfNVHib12")).toBe("opaque");
+    expect(idShape("cus_jQHuVfTIcYGWFJ")).toBe("opaque");
+    expect(idShape("kqCkJJQ-zlIp-EvKFGuaY")).toBe("opaque");
+    expect(idShape("dQw4w9WgXcQ")).toBe("short");
     // Handles with a year are still handles.
     expect(idShape("ada_lovelace_1988")).toBe("username");
     expect(idShape("john.doe.1990")).toBe("username");

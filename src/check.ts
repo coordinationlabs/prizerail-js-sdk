@@ -79,18 +79,27 @@ export type IdShape =
  * draw, so one that reads as an email, a username or a small number can be
  * tied back to a person, or guessed, by anyone who tries.
  */
+/**
+ * A word as a person types one: lowercase, Capitalized or ALLCAPS. A run
+ * of letters with capitals inside it (jQHuVfTIcYGWFJ) is random, so the
+ * handle rules below are case-sensitive and never match it.
+ */
+const WORD = "(?:[a-z]+|[A-Z][a-z]*|[A-Z]+)";
+const HANDLE_WITH_YEAR = new RegExp(`^${WORD}(?:[_.-]${WORD})+[_.-]?\\d{1,4}$`);
+const LABELLED_COUNTER = new RegExp(`^${WORD}[_.-]?\\d{3,}$`);
+const HANDLE = new RegExp(`^${WORD}(?:[_.-]${WORD})*(?:[_.-]?\\d{1,4})?$`);
+
 export function idShape(id: string): IdShape {
   if (id.includes("@")) return "email";
   // A space or a letter beyond ASCII is a person's name, never a generated id.
   if (/\s/.test(id) || /[^\x20-\x7e]/.test(id)) return "username";
-  // A title-cased handle with a year: Ada_Lovelace_1988. Words only, with
-  // a separator, and digits only on the end.
-  if (/^[A-Za-z]+(?:[_.-][A-Za-z]+)+[_.-]?\d{1,4}$/.test(id)) return "username";
+  // A handle with a year: Ada_Lovelace_1988. Words with a separator, and
+  // digits only on the end.
+  if (HANDLE_WITH_YEAR.test(id)) return "username";
   if (/^\d+$/.test(id)) return "number";
   // A word and then only digits is a labelled counter: customer00000001,
   // user_1042. The label hides nothing, and the number is guessable.
-  if (/^[a-z]+[_.-]?\d{3,}$/i.test(id) && !/^[0-9a-f]+$/i.test(id))
-    return "number";
+  if (LABELLED_COUNTER.test(id) && !/^[0-9a-f]+$/i.test(id)) return "number";
   if (
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
   )
@@ -113,15 +122,14 @@ export function idShape(id: string): IdShape {
   if (id.length < 16) {
     // Hex this short is a truncated hash: too short, not a name.
     if (/^[0-9a-f]+$/i.test(id)) return "short";
-    return /^[a-z][a-z0-9_.-]*$/i.test(id) ? "username" : "short";
+    return HANDLE.test(id) ? "username" : "short";
   }
   // A handle reads as words: letters with separators, and at most a short
   // run of digits on the end, as in ada_lovelace_1988. One long word with
   // no separators (a cuid2) or digits inside it (usr_k3j9d8s7f6g5h4j3) is a
   // generated id.
-  const words = /^[a-z]+(?:[_.-][a-z]+)*(?:[_.-]?\d{1,4})?$/i.test(id);
   const oneLongWord = /^[a-z]{20,}$/i.test(id);
-  return words && !oneLongWord ? "username" : "opaque";
+  return HANDLE.test(id) && !oneLongWord ? "username" : "opaque";
 }
 
 /**
@@ -509,7 +517,11 @@ async function checkRest(
     result = await campaign.drawings.verify(drawing.id);
   } catch (error) {
     // The entrant list is read page by page with no retries, so a blip
-    // here is reported with the draw kept, not thrown over it.
+    // here is reported with the draw kept, not thrown over it. A bug is
+    // still a crash: fetch's own TypeError is the one read failure that
+    // shares the class.
+    if (error instanceof TypeError && !/fetch/i.test(error.message))
+      throw error;
     checks.push(
       fail(
         "Its proof verifies",
