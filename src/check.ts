@@ -106,6 +106,9 @@ export function idShape(id: string): IdShape {
     return "uuid";
   // Hex of 16 or more characters is a hash, or a 64-bit or wider random id.
   if (/^(0x)?[0-9a-f]{16,}$/i.test(id)) return "opaque";
+  // A camelCase handle: two words with one capital between them, and at
+  // most a short run of digits on the end.
+  if (/^[a-z]{2,}[A-Z][a-z]{2,}\d{0,4}$/.test(id)) return "username";
   // Mixed case this long is a generated id (nanoid, a Firebase UID, a
   // prefixed random id like cus_Nx6v2dG9mLk8Qa), never a handle someone typed.
   if (
@@ -171,11 +174,20 @@ export function checkEntrantIds(entrants: SentEntrant[]): Check[] {
       )
     );
   }
-  if (shapes.has("username")) {
+  const usernames = shapes.get("username") ?? [];
+  if (usernames.length > 0) {
+    // The handle shape is a heuristic: a random id now and then reads as
+    // one (usr_hoajwtbmnhlvlcfv). An integration that sends usernames
+    // sends nearly all of them that way, so a few in a large sample is a
+    // note, not a failure.
+    const stragglers =
+      usernames.length < 20 && usernames.length < entrants.length * 0.02;
     checks.push(
-      fail(
-        "Entrant ids are not usernames",
-        `${example("username")}. A name can be tied back to a person. Send an HMAC of your user id instead.`
+      (stragglers ? note : fail)(
+        stragglers
+          ? "A few entrant ids read like usernames"
+          : "Entrant ids are not usernames",
+        `${example("username")}. A name can be tied back to a person. ${stragglers ? "Fine if these are random ids that happen to look like words. If they're names, send" : "Send"} an HMAC of your user id instead.`
       )
     );
   }

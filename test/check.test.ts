@@ -119,6 +119,8 @@ describe("idShape", () => {
     expect(idShape("john.doe.1990")).toBe("username");
     expect(idShape("jsmith42")).toBe("username");
     expect(idShape("Ada_Lovelace_1988")).toBe("username");
+    expect(idShape("elizabethHernandez")).toBe("username");
+    expect(idShape("maximilianSmith82")).toBe("username");
     // Names, with spaces or letters beyond ASCII, whatever their length.
     expect(idShape("Christopher Johnson")).toBe("username");
     expect(idShape("josé.garcía")).toBe("username");
@@ -170,6 +172,20 @@ describe("checkEntrantIds", () => {
       "✗ Entrant ids are not your user ids",
     ]);
     expect(checks[2].detail).toContain("running in sequence");
+  });
+  it("notes a few username-shaped ids in a large sample rather than failing", () => {
+    const random = Array.from({ length: 200 }, (_, i) =>
+      entrant(`${HEX.slice(0, 60)}${i.toString(16).padStart(4, "0")}`)
+    );
+    const checks = checkEntrantIds([
+      ...random,
+      entrant("usr_hoajwtbmnhlvlcfv"),
+    ]);
+    expect(labels(checks)).toEqual(["i A few entrant ids read like usernames"]);
+    // A sample that is mostly handles still fails.
+    expect(
+      labels(checkEntrantIds([entrant("ada_lovelace"), entrant("jsmith42")]))
+    ).toEqual(["✗ Entrant ids are not usernames"]);
   });
   it("notes UUIDs rather than failing them", () => {
     expect(
