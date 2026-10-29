@@ -155,7 +155,7 @@ Write them in the project's own test framework. Each one guards a rule above:
 
 ## 8. Try it in the sandbox
 
-With a `pr_sandbox_` key and a sandbox campaign, send a few entrants and then **draw now**: `campaign.drawings.run(drawingId)` in the SDK, or `POST /campaigns/{slug}/drawings/{id}/run`, or the **Draw now** button on the drawing in the sandbox portal. The drawing locks, settles and pays within seconds, and `campaign.drawings.latest()` shows the winners. Then run `npx prizerail check <slug> --draw` to check the whole integration end to end (the `prizerail-check` skill).
+With a `pr_sandbox_` key and a sandbox campaign, send a few entrants and then run `npx prizerail check <slug> --draw` (the `prizerail-check` skill). It checks the key, the campaign and what was sent, then **draws now**: the drawing locks, settles and pays within seconds, and its proof is verified, so the whole integration is seen to pass. Draw now consumes the drawing's entries and opens a fresh, empty one, so send entries again before any second draw. To draw by hand instead, use `campaign.drawings.run(drawingId)` in the SDK, `POST /campaigns/{slug}/drawings/{id}/run`, or the **Draw now** button on the drawing in the sandbox portal, then `campaign.drawings.latest()` shows the winners and `npx prizerail verify <slug> <drawing id>` checks the proof.
 
 ## Checklist before handing back
 

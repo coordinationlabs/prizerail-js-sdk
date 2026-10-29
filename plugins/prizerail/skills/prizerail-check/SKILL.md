@@ -40,7 +40,7 @@ It prints `✓` for a passing check, `✗` for a failing one, and `i` for a note
 If `npx` can't run, the same checks by hand, all with `Authorization: Bearer $PRIZERAIL_API_KEY` against the site the key belongs to:
 
 1. `GET /api/v1/campaigns/{slug}` for `status` and `nextDrawing` (its `cutoffAt` is when entries close).
-2. `GET /api/v1/campaigns/{slug}/entries?limit=1000` for the open drawing's `entrantCount`, `totalEntries` and entrants, paging with `after` until `next` is `null`.
+2. `GET /api/v1/campaigns/{slug}/entries?limit=1000` for the open drawing's `entrantCount`, `totalEntries` and entrants. Take `drawing.id` from the first page and pass it as `drawing={id}` with `after` on every later page until `next` is `null`, so a cutoff mid-way can't mix two drawings.
 3. In the sandbox, `POST /api/v1/campaigns/{slug}/drawings/{id}/run`, then `GET /api/v1/campaigns/{slug}/drawings/{id}` until `status` is `settled` or `paid`.
 4. `npx prizerail verify <slug> <drawing id>`, or download `https://www.prizerail.com/verify/verify-draw.mjs` and run it on the drawing's `proof.json`.
 
