@@ -50,13 +50,15 @@ async function main(argv: string[]): Promise<number> {
   const args = [...argv];
   const siteAt = args.indexOf("--site");
   const site = siteAt === -1 ? undefined : args.splice(siteAt, 2)[1];
+  const drawAt = args.indexOf("--draw");
+  const draw = drawAt !== -1;
+  if (draw) args.splice(drawAt, 1);
   const [command, a, b] = args;
   if (command === "--version" || command === "-v") {
     console.log(VERSION);
     return 0;
   }
   if (command === "check" && a) {
-    const draw = args.includes("--draw");
     const apiKey = process.env.PRIZERAIL_API_KEY;
     if (!apiKey) {
       console.error("Set PRIZERAIL_API_KEY to your pr_… key.");

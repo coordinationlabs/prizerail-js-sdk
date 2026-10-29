@@ -96,6 +96,13 @@ describe("idShape", () => {
     expect(idShape("1042")).toBe("number");
     expect(idShape("3f2a9c1e-5b7d-4e8f-9a0b-1c2d3e4f5a6b")).toBe("uuid");
     expect(idShape("a1b2c3")).toBe("short");
+    // Generated ids a partner stores: nanoid, CUID, prefixed random ids.
+    expect(idShape("V1StGXR8_Z5jdHi6B-myT")).toBe("opaque");
+    expect(idShape("cus_Nx6v2dG9mLk8Qa")).toBe("opaque");
+    expect(idShape("clh3k2x9a0000qzrmn831i7rn")).toBe("opaque");
+    // Handles with a year are still handles.
+    expect(idShape("ada_lovelace_1988")).toBe("username");
+    expect(idShape("john.doe.1990")).toBe("username");
   });
 });
 
@@ -248,11 +255,72 @@ describe("checkCampaign", () => {
     expect(last.detail).toContain("only in the sandbox");
   });
 
+  it("stops polling a drawing that was skipped or needs attention", async () => {
+    const entrants = [entrant(HEX)];
+    const { fetch, calls } = scripted(
+      json(campaign()),
+      entriesPage(entrants),
+      entriesPage(entrants),
+      json({
+        drawing: {
+          id: "d1",
+          status: "skipped",
+          needsAttention: null,
+          winners: [],
+        },
+      })
+    );
+    const result = await checkCampaign(client(fetch), {
+      draw: true,
+      pollMs: 1,
+    });
+    expect(result.checks.at(-1)).toMatchObject({
+      ok: false,
+      label: "A draw runs now",
+    });
+    expect(result.checks.at(-1)?.detail).toContain("without a draw");
+    expect(
+      calls.filter(c => c.url.pathname.endsWith("/drawings/d1"))
+    ).toHaveLength(0);
+  });
+
+  it("reads the drawing when the run request got no answer, since it may have run", async () => {
+    const entrants = [entrant(HEX)];
+    const { fetch } = scripted(
+      json(campaign()),
+      entriesPage(entrants),
+      entriesPage(entrants),
+      new TypeError("fetch failed"),
+      json({
+        drawing: {
+          id: "d1",
+          status: "settled",
+          needsAttention: null,
+          winners: [{ position: 0, winner: HEX }],
+        },
+      }),
+      json({
+        format: "prizerail-draw-proof/3",
+        campaign: { id: "c", name: "Demo" },
+        drawing: { id: "d1", number: 1, drawAt: inAnHour() },
+      })
+    );
+    const result = await checkCampaign(client(fetch), {
+      draw: true,
+      pollMs: 1,
+    });
+    expect(labels(result.checks).slice(-2)).toEqual([
+      "✓ A draw runs now",
+      "✗ Its proof verifies",
+    ]);
+  });
+
   it("draws, polls until settled, and verifies the proof", async () => {
     const entrants = [entrant(HEX)];
     const settled = {
       id: "d1",
       status: "settled",
+      needsAttention: null,
       winners: [{ position: 0, winner: HEX }],
     };
     const { fetch, calls } = scripted(

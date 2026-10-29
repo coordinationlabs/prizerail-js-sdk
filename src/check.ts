@@ -88,17 +88,23 @@ export function idShape(id: string): IdShape {
     return "uuid";
   // Hex of 32 or more characters is a hash or a key-sized random id.
   if (/^(0x)?[0-9a-f]{32,}$/i.test(id)) return "opaque";
-  // Base64 or similar, long enough to carry 128 bits.
-  if (/^[A-Za-z0-9_\-+/=]{22,}$/.test(id) && /\d/.test(id) && /[a-z]/i.test(id))
+  // Mixed case with a digit is a generated id (nanoid, CUID, a prefixed
+  // random id like cus_Nx6v2dG9mLk8Qa), never a handle someone typed.
+  if (id.length >= 16 && /[a-z]/.test(id) && /[A-Z]/.test(id) && /\d/.test(id))
+    return "opaque";
+  // Base64 or similar of 21 characters or more, a nanoid's length, with
+  // both letters and digits. All-letter strings this long are rare in
+  // random ids and common in names, so they go on to the username test.
+  if (/^[A-Za-z0-9_\-+/=]{21,}$/.test(id) && /\d/.test(id) && /[a-z]/i.test(id))
     return "opaque";
   if (id.length < 16) {
     // Hex this short is a truncated hash: too short, not a name.
     if (/^[0-9a-f]+$/i.test(id)) return "short";
     return /^[a-z][a-z0-9_.-]*$/i.test(id) ? "username" : "short";
   }
-  return /^[a-z][a-z0-9_.-]*$/i.test(id) && !/\d{3,}/.test(id)
-    ? "username"
-    : "opaque";
+  // A word with separators, lowercase, reads as a handle even with a year
+  // on the end: ada_lovelace_1988. Anything else this long is opaque.
+  return /^[a-z][a-z0-9_.-]*$/i.test(id) ? "username" : "opaque";
 }
 
 /** True when the numeric ids run like a counter: 1041, 1042, 1043. */
@@ -368,20 +374,45 @@ export async function checkCampaign(
       );
       return done({ campaign: info });
     }
-    if (error instanceof PrizerailError) {
+    if (error instanceof PrizerailError && error.status === 0) {
+      // No answer, but the route may well have run: the drawing's status
+      // says, so read it rather than call the draw failed.
+      drawing = await campaign.drawings.get(open.id);
+    } else if (error instanceof PrizerailError) {
       checks.push(fail("A draw runs now", error.message));
       return done({ campaign: info });
+    } else {
+      throw error;
     }
-    throw error;
   }
+  const running = (d: Drawing) =>
+    d.status === "locked" || d.status === "entropy_requested";
   const deadline = now() + DRAW_WAIT_MS;
   while (
-    drawing.status !== "settled" &&
-    drawing.status !== "paid" &&
+    running(drawing) &&
+    drawing.needsAttention === null &&
     now() < deadline
   ) {
     await sleep(options.pollMs ?? 5_000);
     drawing = await campaign.drawings.get(drawing.id);
+  }
+  if (drawing.status === "skipped") {
+    checks.push(
+      fail(
+        "A draw runs now",
+        `Drawing ${drawing.id} closed without a draw: it had no entries at the cutoff.`
+      )
+    );
+    return done({ campaign: info, drawing });
+  }
+  if (drawing.needsAttention !== null) {
+    checks.push(
+      fail(
+        "A draw runs now",
+        `Drawing ${drawing.id} needs attention: ${drawing.needsAttention}`
+      )
+    );
+    return done({ campaign: info, drawing });
   }
   if (drawing.status !== "settled" && drawing.status !== "paid") {
     checks.push(
