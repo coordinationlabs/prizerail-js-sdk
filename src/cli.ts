@@ -50,6 +50,10 @@ async function main(argv: string[]): Promise<number> {
   const args = [...argv];
   const siteAt = args.indexOf("--site");
   const site = siteAt === -1 ? undefined : args.splice(siteAt, 2)[1];
+  if (siteAt !== -1 && !site) {
+    console.log(USAGE);
+    return 2;
+  }
   const drawAt = args.indexOf("--draw");
   const draw = drawAt !== -1;
   if (draw) args.splice(drawAt, 1);

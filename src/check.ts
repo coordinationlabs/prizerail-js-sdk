@@ -81,6 +81,8 @@ export type IdShape =
  */
 export function idShape(id: string): IdShape {
   if (id.includes("@")) return "email";
+  // A space or a letter beyond ASCII is a person's name, never a generated id.
+  if (/\s/.test(id) || /[^\x00-\x7f]/.test(id)) return "username";
   if (/^\d+$/.test(id)) return "number";
   if (
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
@@ -90,7 +92,13 @@ export function idShape(id: string): IdShape {
   if (/^(0x)?[0-9a-f]{16,}$/i.test(id)) return "opaque";
   // Mixed case this long is a generated id (nanoid, a Firebase UID, a
   // prefixed random id like cus_Nx6v2dG9mLk8Qa), never a handle someone typed.
-  if (id.length >= 16 && /[a-z]/.test(id) && /[A-Z]/.test(id)) return "opaque";
+  if (
+    id.length >= 16 &&
+    /[a-z]/.test(id) &&
+    /[A-Z]/.test(id) &&
+    (/\d/.test(id) || !/[_.-]/.test(id))
+  )
+    return "opaque";
   // Base64 or similar of 21 characters or more, a nanoid's length, with
   // both letters and digits.
   if (/^[A-Za-z0-9_\-+/=]{21,}$/.test(id) && /\d/.test(id) && /[a-z]/i.test(id))
@@ -310,7 +318,9 @@ export async function checkCampaign(
   try {
     return await checkRest(campaign, info, checks, options, now, done);
   } catch (error) {
-    // A read that failed part-way keeps the checks that passed.
+    // A bug is a crash, not a failed check: the CLI exits 2 with it.
+    if (!(error instanceof PrizerailError)) throw error;
+    // An API or network failure part-way keeps the checks that passed.
     checks.push(
       fail(
         "The check finished",
@@ -329,8 +339,6 @@ async function checkRest(
   now: () => number,
   done: (extra?: Partial<CheckResult>) => CheckResult
 ): Promise<CheckResult> {
-  const { siteUrl } = campaign.prizerail;
-  void siteUrl;
   checks.push(
     info.status === "active"
       ? pass(`Campaign "${info.name}" is active`)
@@ -405,7 +413,9 @@ async function checkRest(
     }
     const unanswered =
       error instanceof PrizerailError &&
-      (error.status === 0 || error.code === "invalid_response");
+      (error.status === 0 ||
+        error.status >= 500 ||
+        error.code === "invalid_response");
     if (!unanswered) {
       if (error instanceof PrizerailError) {
         checks.push(fail("A draw runs now", error.message));

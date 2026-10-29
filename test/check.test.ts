@@ -110,6 +110,9 @@ describe("idShape", () => {
     expect(idShape("ada_lovelace_1988")).toBe("username");
     expect(idShape("john.doe.1990")).toBe("username");
     expect(idShape("jsmith42")).toBe("username");
+    // Names, with spaces or letters beyond ASCII, whatever their length.
+    expect(idShape("Christopher Johnson")).toBe("username");
+    expect(idShape("josé.garcía")).toBe("username");
   });
 });
 
@@ -320,6 +323,44 @@ describe("checkCampaign", () => {
       "✓ A draw runs now",
       "✗ Its proof verifies",
     ]);
+  });
+
+  it("reads the drawing after a 5xx on the run request, since the route may have run", async () => {
+    const entrants = [entrant(HEX)];
+    const { fetch } = scripted(
+      json(campaign()),
+      entriesPage(entrants),
+      entriesPage(entrants),
+      new Response("<html>504</html>", { status: 504 }),
+      json({
+        drawing: {
+          id: "d1",
+          status: "settled",
+          needsAttention: null,
+          winners: [{ position: 0, winner: HEX }],
+        },
+      }),
+      json({
+        format: "prizerail-draw-proof/3",
+        campaign: { id: "c", name: "Demo" },
+        drawing: { id: "d1", number: 1, drawAt: inAnHour() },
+      })
+    );
+    const result = await checkCampaign(client(fetch), {
+      draw: true,
+      pollMs: 1,
+    });
+    expect(labels(result.checks).slice(-2)).toEqual([
+      "✓ A draw runs now",
+      "✗ Its proof verifies",
+    ]);
+  });
+
+  it("lets a bug escape rather than report it as a failed check", async () => {
+    const { fetch } = scripted(json(campaign()));
+    const c = client(fetch);
+    vi.spyOn(c.entries, "list").mockRejectedValue(new TypeError("boom"));
+    await expect(checkCampaign(c)).rejects.toThrow("boom");
   });
 
   it("says the draw didn't run when the request got no answer and the drawing is still open", async () => {
