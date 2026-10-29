@@ -5,7 +5,7 @@ description: Add Prizerail to an app so its users enter the partner's prize draw
 
 # Integrate Prizerail
 
-Prizerail runs prize draws for partner apps. The partner's backend sends each eligible user as an **entrant** with their number of **entries** (chances: 5 entries is five times as likely to win each prize as 1), and at each **cutoff** Prizerail locks the list, draws the winners from it with a public random value, and sends the prizes to the partner's wallet to pay out. The partner never picks winners and never handles the randomness. This skill builds the sending side.
+Prizerail runs prize draws for partner apps. The partner's backend sends each eligible user as an **entrant** with their number of **entries** (chances: 5 entries is five times as likely to be picked as 1), and at each **cutoff** Prizerail locks the list, draws the winners from it with a public random value, and sends the prizes to the partner's wallet to pay out. The partner never picks winners and never handles the randomness. This skill builds the sending side.
 
 Read the docs when a detail isn't here: [Send entries](https://docs.prizerail.com/api/send-entries), [Concepts](https://docs.prizerail.com/getting-started/concepts), [Winners and eligibility](https://docs.prizerail.com/campaigns/winners), or everything at [llms-full.txt](https://docs.prizerail.com/llms-full.txt). Whole runnable projects are in [prizerail-examples](https://github.com/coordinationlabs/prizerail-examples): a Next.js app that adds entries as users earn them, a Node worker that sends the day's entries, and the same send in Python.
 
@@ -96,7 +96,13 @@ A campaign's official rules can narrow these. Read them from the partner, and po
 Set mode, from a job that runs before each cutoff:
 
 ```ts
-import { Prizerail, PrizerailCutoffError, hashEntrant, type Entrant } from "prizerail"
+import {
+  Prizerail,
+  PrizerailCutoffError,
+  PrizerailDrawingChangedError,
+  hashEntrant,
+  type Entrant,
+} from "prizerail"
 
 const campaign = new Prizerail({ apiKey: process.env.PRIZERAIL_API_KEY }).campaign(
   process.env.PRIZERAIL_CAMPAIGN!
@@ -114,8 +120,12 @@ export async function sendTodaysEntries() {
     const res = await campaign.entries.send(entrants)
     return { drawingId: res.drawing.id, sent: res.sent, entrantCount: res.entrantCount }
   } catch (error) {
-    if (error instanceof PrizerailCutoffError) {
-      // error.progress.sent entrants were confirmed. Check the rest with entries.list().
+    if (
+      error instanceof PrizerailCutoffError ||
+      error instanceof PrizerailDrawingChangedError
+    ) {
+      // Both carry progress: error.progress.sent entrants were confirmed in
+      // error.progress.drawing. Check the rest with entries.list().
       throw new Error(`${error.progress.sent} sent to ${error.progress.drawing.id}: ${error.detail}`)
     }
     throw error

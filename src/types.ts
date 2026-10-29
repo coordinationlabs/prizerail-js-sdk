@@ -138,8 +138,8 @@ export type Entrant =
       entrantId: string;
       /**
        * Their number of entries, a whole number from 1. Leave it out and it's
-       * 1. Entries are chances: 5 entries is five times as likely to win each
-       * prize as 1.
+       * 1. Entries are chances: 5 entries is five times as likely to be picked
+       * as 1.
        */
       entries?: number;
       /** Up to 40 characters. */
