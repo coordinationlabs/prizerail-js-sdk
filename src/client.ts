@@ -21,7 +21,7 @@ import type {
 } from "./types.js";
 import { type DrawProof, type VerifyResult, verifyDraw } from "./verify.js";
 
-export const VERSION = "1.2.0";
+export const VERSION = "1.2.1";
 
 const badPage = (detail: string) =>
   new PrizerailError(0, "invalid_response", `Paging stopped: ${detail}.`);

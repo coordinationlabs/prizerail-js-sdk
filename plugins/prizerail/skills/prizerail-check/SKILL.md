@@ -32,6 +32,7 @@ It prints `✓` for a passing check, `✗` for a failing one, and `i` for a note
 - **No entries in the open drawing** with a passing key and campaign: the sender hasn't run yet, or it's pointed at another campaign or the other environment. Check `PRIZERAIL_CAMPAIGN` and the key's prefix against the site.
 - **Entries in the last drawing but not this one:** entries land in the drawing whose cutoff is next when they arrive, and totals don't carry over. A daily job must run before each cutoff.
 - **Every entrant at 1 entry** when the app rewards actions: set mode sends each entrant's total, so `entries` has to be sent every time. Or the app meant increment mode.
+- **One user's entries missing:** look that id up with `campaign.drawings.entrant(drawingId, entrantId)`, or `GET /api/v1/campaigns/{slug}/drawings/{id}/entrant?entrantId=…` with a `+` sent as `%2B`. `entered: false` is a `200`, not an error: the entries went to another drawing, or never arrived.
 - **Fewer entrants than expected:** the eligibility filter, or an `eventId` reused across different events (`409 event_conflict`, nothing in that request stored). Look at the sender's logs for `409`s.
 - **A sandbox draw with winners:** the integration works end to end. `npx prizerail verify <slug> <drawing id>` checks any draw again from its public proof.
 

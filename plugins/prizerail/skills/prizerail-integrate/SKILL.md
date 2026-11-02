@@ -167,6 +167,21 @@ Write them in the project's own test framework. Each one guards a rule above:
 
 With a `pr_sandbox_` key and a sandbox campaign, send a few entrants and then run `npx prizerail check <slug> --draw` (the `prizerail-check` skill). It checks the key, the campaign and what was sent, then **draws now**: the drawing locks, settles and pays within seconds, and its proof is verified, so the whole integration is seen to pass. Draw now consumes the drawing's entries and opens a fresh, empty one, so send entries again before any second draw. To draw by hand instead, use `campaign.drawings.run(drawingId)` in the SDK, `POST /campaigns/{slug}/drawings/{id}/run`, or the **Draw now** button on the drawing in the sandbox portal, then `campaign.drawings.latest()` shows the winners and `npx prizerail verify <slug> <drawing id>` checks the proof.
 
+## 9. When a user asks whether their entries counted
+
+Look them up in that drawing rather than paging `entries.all()`, from the server like every call with the key:
+
+```ts
+const entrantId = await hashEntrant(user.id, process.env.ENTRANT_ID_KEY!)
+const found = await campaign.drawings.entrant(drawingId, entrantId)
+// { drawing, entered, entries, position, receivedAt, drawn, winner }
+```
+
+- `entered: false` is an answer, not an error: entries sent after the cutoff went to the next drawing, and ones that failed to send aren't anywhere. Check the next drawing and the sender's logs.
+- `winner` is `null` for everyone until `drawn` is true, so check `drawn` before reading a `null` winner as a loss.
+- `position` is `null` until the drawing locks. In a guarantee draw (`drawing.kind` is `"guarantee"`) everyone has 1 entry, `position` is set from the start, and `receivedAt` is when the guarantee draw was made.
+- Plain HTTP: `GET {base}/campaigns/{slug}/drawings/{id}/entrant?entrantId=…`, URL-encoded, so a `+` goes as `%2B`. A bare `+` reads as a space, and the lookup finds no one.
+
 ## Checklist before handing back
 
 - [ ] Mode chosen and explained in a comment at the sender

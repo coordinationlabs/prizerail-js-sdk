@@ -96,6 +96,11 @@ If the user can't run code, the campaign page has a "Verify in your browser" but
 
 To cross-check with a library instead, viem's `keccak256(encodeAbiParameters(...))` with the types above gives the same values.
 
+## Check someone was in a draw
+
+- **With no key:** once a draw is drawn, `verifyDraw(proofUrl)` and then `wasEntered(entrantId, result.entrants)` from the `prizerail` package find their row in the published list, checked against its fingerprint. That is the independent check, and it gives their `entries` and index only.
+- **With the partner's API key:** `campaign.drawings.entrant(drawingId, entrantId)`, or `GET /api/v1/campaigns/{slug}/drawings/{id}/entrant?entrantId=…` with a `+` sent as `%2B`, says what Prizerail received for any drawing, open ones too, and what they won. It is Prizerail's own record, not an independent check. `entered: false` is an answer, not an error. `winner` is `null` for everyone until `drawn` is true, so check `drawn` before reading a `null` winner as a loss. In a guarantee draw everyone has 1 entry.
+
 ## Gotchas
 
 - **The index is the order, not the row.** A shuffled `entrants.json` gives the same root and winners. A duplicate, missing or out-of-range index makes the list invalid, and the verify script reports it.
