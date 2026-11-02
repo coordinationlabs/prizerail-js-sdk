@@ -13,6 +13,7 @@ import type {
   DrawingsPage,
   Entrant,
   EntrantEvent,
+  EntrantLookup,
   EntriesPage,
   Guarantee,
   SendEntriesResponse,
@@ -20,7 +21,7 @@ import type {
 } from "./types.js";
 import { type DrawProof, type VerifyResult, verifyDraw } from "./verify.js";
 
-export const VERSION = "1.1.1";
+export const VERSION = "1.2.0";
 
 const badPage = (detail: string) =>
   new PrizerailError(0, "invalid_response", `Paging stopped: ${detail}.`);
@@ -614,6 +615,20 @@ export class DrawingsClient {
         this.campaign.path(`/drawings/${encodeURIComponent(id)}`)
       )
     ).drawing;
+  }
+
+  /**
+   * Whether one entrant's entries reached a drawing, how many it holds, and
+   * what they won once it's drawn, from what Prizerail received. Pass the
+   * `entrantId` as you sent it. Someone not in the drawing resolves with
+   * `entered: false`, not an error.
+   */
+  async entrant(id: string, entrantId: string): Promise<EntrantLookup> {
+    return this.campaign.http.request<EntrantLookup>(
+      "GET",
+      this.campaign.path(`/drawings/${encodeURIComponent(id)}/entrant`),
+      { query: { entrantId } }
+    );
   }
 
   /**

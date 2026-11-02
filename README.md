@@ -105,6 +105,15 @@ for await (const drawing of campaign.drawings.all({ status: "paid" })) {
 const guarantees = await campaign.guarantees.list()
 ```
 
+To answer a user who asks whether their entries counted, look them up in one drawing by the id you sent:
+
+```ts
+const found = await campaign.drawings.entrant(drawingId, entrantId)
+// { entered, entries, position, receivedAt, drawn, winner }
+```
+
+`entered` is false, not an error, for someone who isn't in the drawing. `winner` stays null for everyone until `drawn` is true. See [Look up an entrant](https://docs.prizerail.com/api/drawings#look-up-an-entrant).
+
 ## Draw now, in the sandbox
 
 In the sandbox, `campaign.drawings.run(id)` closes a drawing's entries now and draws it, so you can see a whole draw without waiting for its cutoff. It resolves with the drawing, usually settled within seconds. Anywhere else it throws a `PrizerailError` with code `sandbox_only`. See [Draw now](https://docs.prizerail.com/api/drawings#draw-now-sandbox-only).
