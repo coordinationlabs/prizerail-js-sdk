@@ -138,11 +138,20 @@ export type EntrantLookup = {
   entrantId: string;
   /** Whether the drawing holds entries for this id. */
   entered: boolean;
-  /** Their number of entries, or null if they didn't enter. */
+  /**
+   * Their number of entries, or null if they didn't enter. 1 in a guarantee
+   * draw, which gives everyone who entered the period one entry.
+   */
   entries: number | null;
-  /** Their place in the locked entrant list. Null until the cutoff. */
+  /**
+   * Their place in the locked entrant list. Null until the drawing locks,
+   * shortly after the cutoff. Set from the start in a guarantee draw.
+   */
   position: number | null;
-  /** When their first entry for this drawing arrived. */
+  /**
+   * When their first entry for this drawing arrived. In a guarantee draw,
+   * when the draw was made.
+   */
   receivedAt: string | null;
   /**
    * Whether the winners are known: true once settled or paid. Until then
