@@ -169,16 +169,16 @@ With a `pr_sandbox_` key and a sandbox campaign, send a few entrants and then ru
 
 ## 9. When a user asks whether their entries counted
 
-Look them up in that drawing rather than paging `entries.all()`, from the server like every call with the key:
+Look them up in that drawing rather than paging `entries.all()`, from the server like every call with the key. The drawing taking entries now is `(await campaign.entries.openDrawing()).id`, or `drawing.id` from a `send()` result. Earlier ones come from `campaign.drawings.list()`, newest first, and open ones from `campaign.drawings.list({ status: "open" })`, soonest cutoff first, so the next one is the open drawing after it.
 
 ```ts
 const entrantId = await hashEntrant(user.id, process.env.ENTRANT_ID_KEY!)
 const found = await campaign.drawings.entrant(drawingId, entrantId)
-// { drawing, entered, entries, position, receivedAt, drawn, winner }
+// { drawing, entrantId, entered, entries, position, receivedAt, drawn, winner }
 ```
 
 - `entered: false` is an answer, not an error: entries sent after the cutoff went to the next drawing, and ones that failed to send aren't anywhere. Check the next drawing and the sender's logs.
-- `winner` is `null` for everyone until `drawn` is true, so check `drawn` before reading a `null` winner as a loss.
+- `winner` is `null` for everyone until `drawn` is true, so check `drawn` before reading a `null` winner as a loss. A `skipped` drawing (`drawing.status`) was never drawn, so there's no winner to wait for.
 - `position` is `null` until the drawing locks. In a guarantee draw (`drawing.kind` is `"guarantee"`) everyone has 1 entry, `position` is set from the start, and `receivedAt` is when the guarantee draw was made.
 - Plain HTTP: `GET {base}/campaigns/{slug}/drawings/{id}/entrant?entrantId=…`, URL-encoded, so a `+` goes as `%2B`. A bare `+` reads as a space, and the lookup finds no one.
 

@@ -98,8 +98,8 @@ To cross-check with a library instead, viem's `keccak256(encodeAbiParameters(...
 
 ## Check someone was in a draw
 
-- **With no key:** once a draw is drawn, `verifyDraw(proofUrl)` and then `wasEntered(entrantId, result.entrants)` from the `prizerail` package find their row in the published list, checked against its fingerprint. That is the independent check, and it gives their `entries` and index only.
-- **With the partner's API key:** `campaign.drawings.entrant(drawingId, entrantId)`, or `GET /api/v1/campaigns/{slug}/drawings/{id}/entrant?entrantId=…` with a `+` sent as `%2B`, says what Prizerail received for any drawing, open ones too, and what they won. It is Prizerail's own record, not an independent check. `entered: false` is an answer, not an error. `winner` is `null` for everyone until `drawn` is true, so check `drawn` before reading a `null` winner as a loss. In a guarantee draw everyone has 1 entry.
+- **With no key:** once a draw is drawn, `verifyDraw(proofUrl)` and then `wasEntered(entrantId, result.entrants ?? [])` from the `prizerail` package find their row in the published list, checked against its fingerprint. That is the independent check, and it gives their `entries` and index only.
+- **With the partner's API key:** `new Prizerail({ apiKey }).campaign(slug).drawings.entrant(drawingId, entrantId)`, which picks the site from the key, or `GET /api/v1/campaigns/{slug}/drawings/{id}/entrant?entrantId=…` with a `+` sent as `%2B`, on the key's own site (`https://sandbox.prizerail.com` for a `pr_sandbox_` key), says what Prizerail received for any drawing, open ones too, and what they won. It is Prizerail's own record, not an independent check. `entered: false` is an answer, not an error. `winner` is `null` for everyone until `drawn` is true, so check `drawn` before reading a `null` winner as a loss, and a `skipped` drawing was never drawn. In a guarantee draw everyone has 1 entry.
 
 ## Gotchas
 
