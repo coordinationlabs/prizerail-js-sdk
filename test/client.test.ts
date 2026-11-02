@@ -591,10 +591,10 @@ describe("entries.increment", () => {
 });
 
 describe("drawings.entrant", () => {
-  it("looks up one entrant, with the id in the query", async () => {
+  it("looks up one entrant, with the id encoded in the query", async () => {
     const found = {
       drawing: { id: "d1", status: "paid" },
-      entrantId: "user/42 a",
+      entrantId: "jane+1 a/b",
       entered: true,
       entries: 3,
       position: 7,
@@ -603,14 +603,16 @@ describe("drawings.entrant", () => {
       winner: { position: 0, amountCents: 500, heldForManualPayout: false },
     };
     const { fetch, calls } = scripted(json(found));
-    expect(await client(fetch).drawings.entrant("d1", "user/42 a")).toEqual(
+    expect(await client(fetch).drawings.entrant("d1", "jane+1 a/b")).toEqual(
       found
     );
     expect(calls[0].method).toBe("GET");
     expect(calls[0].url.pathname).toBe(
       "/api/v1/campaigns/demo/drawings/d1/entrant"
     );
-    expect(calls[0].url.searchParams.get("entrantId")).toBe("user/42 a");
+    expect(calls[0].url.searchParams.get("entrantId")).toBe("jane+1 a/b");
+    // A bare + would reach the API as a space.
+    expect(calls[0].url.search).toContain("jane%2B1");
   });
 
   it("throws not_found for a drawing that isn't in the campaign", async () => {
