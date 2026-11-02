@@ -5,7 +5,7 @@ description: "Check the status of a Prizerail campaign's draws (whether a draw i
 
 # Prizerail draws: status and verification
 
-Prizerail runs prize draws for partner apps. Through each period the partner sends Prizerail its entrants. At the cutoff Prizerail locks the entrant list, a random value draws the winners from it and decides each winner's prize from the campaign's prize table, and the prizes are sent to the partner to pay out. Everything below uses public endpoints: no keys, no accounts.
+Prizerail runs prize draws for partner apps. Through each period the partner sends Prizerail its entrants. At the cutoff Prizerail locks the entrant list, a random value draws the winners from it and decides each winner's prize from the campaign's prize table, and the prizes are sent to the partner to pay out. Everything below uses public endpoints, with no keys or accounts, except the one lookup marked as needing the partner's API key.
 
 **Never compute the hashes yourself.** keccak256 can't be done reliably by reasoning, and Python's `hashlib.sha3_256` is a different hash (different padding) that gives different answers. Run the verify script below and report what it prints.
 
@@ -95,6 +95,11 @@ It prints `✓` for a check that passes, `✗` for one that fails, and `i` for i
 If the user can't run code, the campaign page has a "Verify in your browser" button on each draw that runs the same script. Mention that it runs on Prizerail's own site, so downloading and running the script is the independent check.
 
 To cross-check with a library instead, viem's `keccak256(encodeAbiParameters(...))` with the types above gives the same values.
+
+## Check someone was in a draw
+
+- **With no key:** once a draw is drawn, `verifyDraw(proofUrl)` and then `wasEntered(entrantId, result.entrants)` from the `prizerail` package find their row in the published list. Only read the answer when `result.ok` is true and `result.entrants` is there: `verifyDraw` still returns the rows when a check fails, and `wasEntered` only searches them. Otherwise say their entry couldn't be verified, not that they weren't in it. That is the independent check, and it gives their `entries` and index only.
+- **With the partner's API key:** `new Prizerail({ apiKey }).campaign(slug).drawings.entrant(drawingId, entrantId)`, which picks the site from the key, or `GET /api/v1/campaigns/{slug}/drawings/{id}/entrant?entrantId=…` with a `+` sent as `%2B`, on the key's own site (`https://sandbox.prizerail.com` for a `pr_sandbox_` key), says what Prizerail received for any drawing, open ones too, and what they won. It is Prizerail's own record, not an independent check. `entered: false` is an answer, not an error. `winner` is `null` for everyone until `drawn` is true, so check `drawn` before reading a `null` winner as a loss, and a `skipped` drawing was never drawn. In a guarantee draw everyone has 1 entry.
 
 ## Gotchas
 
