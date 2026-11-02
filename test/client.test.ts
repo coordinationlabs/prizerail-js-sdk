@@ -590,6 +590,37 @@ describe("entries.increment", () => {
   });
 });
 
+describe("drawings.entrant", () => {
+  it("looks up one entrant, with the id in the query", async () => {
+    const found = {
+      drawing: { id: "d1", status: "paid" },
+      entrantId: "user/42 a",
+      entered: true,
+      entries: 3,
+      position: 7,
+      receivedAt: "2026-11-01T18:00:00.000Z",
+      drawn: true,
+      winner: { position: 0, amountCents: 500, heldForManualPayout: false },
+    };
+    const { fetch, calls } = scripted(json(found));
+    expect(await client(fetch).drawings.entrant("d1", "user/42 a")).toEqual(
+      found
+    );
+    expect(calls[0].method).toBe("GET");
+    expect(calls[0].url.pathname).toBe(
+      "/api/v1/campaigns/demo/drawings/d1/entrant"
+    );
+    expect(calls[0].url.searchParams.get("entrantId")).toBe("user/42 a");
+  });
+
+  it("throws not_found for a drawing that isn't in the campaign", async () => {
+    const { fetch } = scripted(json({ error: "not_found" }, 404));
+    await expect(
+      client(fetch).drawings.entrant("d9", "user-1")
+    ).rejects.toMatchObject({ status: 404, code: "not_found" });
+  });
+});
+
 describe("drawings.run", () => {
   it("posts to run and never retries", async () => {
     const { fetch, calls } = scripted(json({ error: "draw_failed" }, 500));

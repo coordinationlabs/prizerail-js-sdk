@@ -125,6 +125,38 @@ export type Drawing = {
   };
 };
 
+/** One entrant in one drawing, from `drawings.entrant()`. */
+export type EntrantLookup = {
+  drawing: {
+    id: string;
+    kind: DrawingKind;
+    number: number | null;
+    drawAt: string;
+    cutoffAt: string;
+    status: DrawingStatus;
+  };
+  entrantId: string;
+  /** Whether the drawing holds entries for this id. */
+  entered: boolean;
+  /** Their number of entries, or null if they didn't enter. */
+  entries: number | null;
+  /** Their place in the locked entrant list. Null until the cutoff. */
+  position: number | null;
+  /** When their first entry for this drawing arrived. */
+  receivedAt: string | null;
+  /**
+   * Whether the winners are known: true once settled or paid. Until then
+   * `winner` is null for everyone, so null alone doesn't mean they lost.
+   */
+  drawn: boolean;
+  /** Their win, or null. `position` is their slot in the drawing's winners. */
+  winner: {
+    position: number;
+    amountCents: number;
+    heldForManualPayout: boolean;
+  } | null;
+};
+
 export type DrawingsPage = {
   drawings: Drawing[];
   nextBefore: string | null;
