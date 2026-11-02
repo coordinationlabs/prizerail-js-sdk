@@ -5,7 +5,7 @@ description: "Check the status of a Prizerail campaign's draws (whether a draw i
 
 # Prizerail draws: status and verification
 
-Prizerail runs prize draws for partner apps. Through each period the partner sends Prizerail its entrants. At the cutoff Prizerail locks the entrant list, a random value draws the winners from it and decides each winner's prize from the campaign's prize table, and the prizes are sent to the partner to pay out. Everything below uses public endpoints: no keys, no accounts.
+Prizerail runs prize draws for partner apps. Through each period the partner sends Prizerail its entrants. At the cutoff Prizerail locks the entrant list, a random value draws the winners from it and decides each winner's prize from the campaign's prize table, and the prizes are sent to the partner to pay out. Everything below uses public endpoints, with no keys or accounts, except the one lookup marked as needing the partner's API key.
 
 **Never compute the hashes yourself.** keccak256 can't be done reliably by reasoning, and Python's `hashlib.sha3_256` is a different hash (different padding) that gives different answers. Run the verify script below and report what it prints.
 
