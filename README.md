@@ -109,10 +109,10 @@ To answer a user who asks whether their entries counted, look them up in one dra
 
 ```ts
 const found = await campaign.drawings.entrant(drawingId, entrantId)
-// { entered, entries, position, receivedAt, drawn, winner }
+// { entered, entries, position, receivedAt, drawn, winner, winners, totalCents }
 ```
 
-`entered` is false, not an error, for someone who isn't in the drawing. `winner` stays null for everyone until `drawn` is true. See [Look up an entrant](https://docs.prizerail.com/api/drawings#look-up-an-entrant).
+`entered` is false, not an error, for someone who isn't in the drawing. `winner` stays null for everyone until `drawn` is true. In a campaign with repeat winners one entrant can win several slots, so credit users from `winners` or `totalCents`, not `winner` alone. See [Look up an entrant](https://docs.prizerail.com/api/drawings#look-up-an-entrant).
 
 ## Draw now, in the sandbox
 

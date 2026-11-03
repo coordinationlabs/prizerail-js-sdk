@@ -23,6 +23,8 @@ export type DrawProof = {
     count: number;
     totalWeight: number;
     winnersRequested: number;
+    /** One entrant can fill several slots. Absent, or false, they can't. */
+    repeatWinners?: boolean;
     lockedAt: string | null;
   };
   [field: string]: unknown;

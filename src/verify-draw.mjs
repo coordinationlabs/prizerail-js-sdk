@@ -29,7 +29,8 @@
  *    at or above 2^256 mod the weight of the entrants not picked yet. The
  *    pick is that value mod the same weight, and the winner is the entrant
  *    whose range holds it, counting the ones still in, in index order. They
- *    sit out later slots.
+ *    sit out later slots, unless the proof's entrantList.repeatWinners is
+ *    true: then nobody sits out, and one entrant can fill several slots.
  * 4. Each winner's ID hashes to the entry the pick landed on.
  * 5. Each winner's random value is the first
  *    keccak256(abi.encode(bytes32 entropy, bytes32 campaignId,
@@ -310,7 +311,8 @@ export function selectWinners(
   campaignId,
   drawingNumber,
   list,
-  winnerCount
+  winnerCount,
+  repeat = false
 ) {
   const weights = list.map(([, weight]) => weight);
   const sums = new Array(weights.length + 1).fill(0);
@@ -335,7 +337,8 @@ export function selectWinners(
   const entropyBytes = hexBytes(entropy);
   const id = campaignIdBytes32(campaignId);
   const picks = [];
-  for (let slot = 0; slot < Math.min(winnerCount, list.length); slot++) {
+  const slots = repeat ? winnerCount : Math.min(winnerCount, list.length);
+  for (let slot = 0; slot < slots; slot++) {
     const threshold = (1n << 256n) % BigInt(remaining);
     let r;
     for (let k = 0n; ; k++) {
@@ -354,6 +357,7 @@ export function selectWinners(
     const pick = Number(BigInt(r) % BigInt(remaining));
     const entrantIndex = find(pick);
     picks.push({ entrantIndex, selectionValue: r, pick });
+    if (repeat) continue;
     add(entrantIndex, -weights[entrantIndex]);
     remaining -= weights[entrantIndex];
   }
@@ -545,6 +549,9 @@ export function verifyProof(proof, entrants) {
 /** The entrant list's checks: its root, then every pick. */
 function checkEntrants(proof, entrants, check, results) {
   const { root, count, totalWeight, winnersRequested } = proof.entrantList;
+  // Proofs from before the setting have no field, and those draws took
+  // each winner out.
+  const repeat = proof.entrantList.repeatWinners === true;
   if (
     typeof root !== "string" ||
     !HASH.test(root) ||
@@ -562,10 +569,11 @@ function checkEntrants(proof, entrants, check, results) {
     );
     return;
   }
+  // The contract takes at most one slot per entrant, in both modes.
   const expected = Math.min(winnersRequested, count);
   check(
     proof.results.length === expected,
-    `${expected} winner${expected === 1 ? "" : "s"}: ${winnersRequested} asked for, from ${count.toLocaleString("en-US")} entrants`
+    `${expected} winner${expected === 1 ? "" : "s"}: ${winnersRequested} asked for, from ${count.toLocaleString("en-US")} entrants${repeat ? ", repeat winners allowed" : ""}`
   );
   if (!entrants) {
     // The root and the picks are what make an entrants draw checkable, so
@@ -633,7 +641,8 @@ function checkEntrants(proof, entrants, check, results) {
     proof.campaign.id,
     proof.drawing.number,
     list,
-    winnersRequested
+    expected,
+    repeat
   );
   for (const [slot, pick] of picks.entries()) {
     const result = results.get(slot);
