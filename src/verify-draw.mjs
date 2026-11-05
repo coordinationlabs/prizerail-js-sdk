@@ -569,8 +569,13 @@ function checkEntrants(proof, entrants, check, results) {
     );
     return;
   }
-  // The contract takes at most one slot per entrant, in both modes.
-  const expected = Math.min(winnersRequested, count);
+  // Without repeat winners each entrant fills at most one slot, so the draw
+  // has as many winners as asked for, or as entrants if fewer. With them,
+  // every slot asked for is filled. Draws the first contracts ran never
+  // repeat, so their proofs say false or leave the field out.
+  const expected = repeat
+    ? winnersRequested
+    : Math.min(winnersRequested, count);
   check(
     proof.results.length === expected,
     `${expected} winner${expected === 1 ? "" : "s"}: ${winnersRequested} asked for, from ${count.toLocaleString("en-US")} entrants${repeat ? ", repeat winners allowed" : ""}`
