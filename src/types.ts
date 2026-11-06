@@ -55,6 +55,12 @@ export type Campaign = {
     endsAt: string | null;
   };
   winnersPerDraw: number;
+  /**
+   * True when one entrant can win several slots in a draw. New drawings take
+   * a change, so `nextDrawing.repeatWinners` can differ for up to one draw
+   * period. Absent from servers before repeat winners shipped.
+   */
+  repeatWinners?: boolean;
   prizeTable: PrizeTable | null;
   guarantee: {
     amountCents: number;
@@ -69,6 +75,7 @@ export type Campaign = {
     drawAt: string;
     cutoffAt: string;
     winnersPerDraw: number;
+    repeatWinners?: boolean;
     averagePrizeCents: number | null;
   } | null;
 };
@@ -109,6 +116,8 @@ export type Drawing = {
   cutoffAt: string;
   status: DrawingStatus;
   winnersExpected: number;
+  /** Whether one entrant can win several slots in this drawing. */
+  repeatWinners?: boolean;
   prizeTable: PrizeTable | null;
   needsAttention: string | null;
   winners: Winner[];
@@ -158,12 +167,23 @@ export type EntrantLookup = {
    * `winner` is null for everyone, so null alone doesn't mean they lost.
    */
   drawn: boolean;
-  /** Their win, or null. `position` is their slot in the drawing's winners. */
-  winner: {
-    position: number;
-    amountCents: number;
-    heldForManualPayout: boolean;
-  } | null;
+  /**
+   * Their win, or null. `position` is their slot in the drawing's winners.
+   * With repeat winners it's their first slot, so credit users from
+   * `winners` or `totalCents`.
+   */
+  winner: EntrantSlot | null;
+  /** Every slot they won, in slot order. Empty until drawn. */
+  winners?: EntrantSlot[];
+  /** What they won in all, or null if they didn't win. */
+  totalCents?: number | null;
+};
+
+/** One winning slot in `drawings.entrant()`. */
+export type EntrantSlot = {
+  position: number;
+  amountCents: number;
+  heldForManualPayout: boolean;
 };
 
 export type DrawingsPage = {
