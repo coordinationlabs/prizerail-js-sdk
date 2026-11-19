@@ -398,6 +398,21 @@ const usd = cents =>
   })}`;
 
 /**
+ * Why a proof value can't be checked, naming its field, or "" if it can.
+ * `want` is "string" or "whole number".
+ */
+function fieldProblem(value, field, want) {
+  if (want === "string" ? typeof value === "string" : Number.isInteger(value)) {
+    return "";
+  }
+  if (value === undefined || value === null) return `${field} is missing`;
+  const got = Array.isArray(value) ? "a list" : `a ${typeof value}`;
+  return `${field} is ${got}, not a ${want}`;
+}
+
+const isObject = value => typeof value === "object" && value !== null;
+
+/**
  * Every check on a proof, as { ok, label, detail? }. `ok` is true, false, or
  * null for something worth knowing that the math can't settle.
  */
@@ -416,21 +431,43 @@ export function verifyProof(proof, entrants) {
     }
   }
 
-  if (
-    typeof proof.campaign?.id !== "string" ||
-    !Number.isInteger(proof.drawing?.number)
-  ) {
+  if (!isObject(proof)) {
+    check(false, "The proof is a JSON object");
+    return checks;
+  }
+  const idProblem =
+    fieldProblem(proof.campaign?.id, "campaign.id", "string") ||
+    (/^[\x20-\x7e]{1,32}$/.test(proof.campaign.id)
+      ? ""
+      : "campaign.id isn't 1 to 32 ASCII characters");
+  const keyProblems = [
+    idProblem,
+    fieldProblem(proof.drawing?.number, "drawing.number", "whole number"),
+  ].filter(Boolean);
+  if (keyProblems.length > 0) {
     check(
       false,
       "The proof names its campaign ID and drawing number",
-      `this script reads ${proof.format ?? "an unknown format"} proofs only if they have both`
+      `${keyProblems.join(", ")}. This script reads ${proof.format ?? "an unknown format"} proofs only if they have both`
     );
     return checks;
   }
 
   const { denominator, tiers } = proof.prizeTable ?? {};
-  if (!Array.isArray(tiers) || !Array.isArray(proof.results)) {
-    check(false, "The proof has a prize table and results");
+  if (!Array.isArray(tiers) || !tiers.every(isObject)) {
+    check(
+      false,
+      "The proof has a prize table",
+      "prizeTable.tiers is missing or isn't a list of tiers"
+    );
+    return checks;
+  }
+  if (!Array.isArray(proof.results) || !proof.results.every(isObject)) {
+    check(
+      false,
+      "The proof has results",
+      "results is missing or isn't a list of results"
+    );
     return checks;
   }
   const total = tiers.reduce((n, t) => n + t.weight, 0);
@@ -441,6 +478,7 @@ export function verifyProof(proof, entrants) {
     tiers.length >= 2 &&
     tiers.length <= MAX_TIERS &&
     tiers.every(t => Number.isInteger(t.weight) && t.weight > 0) &&
+    tiers.every(t => Number.isInteger(t.amountCents) && t.amountCents >= 0) &&
     total === denominator &&
     tiers.every(
       (t, i) => i === 0 || tiers[i - 1].amountCents >= t.amountCents
@@ -464,9 +502,8 @@ export function verifyProof(proof, entrants) {
   if (!withinLimit) return checks;
   const resultAt = new Map(proof.results.map(r => [r.position, r]));
 
-  const entropy = proof.entropy.value;
   const entrantList = proof.entrantList;
-  if (!entrantList) {
+  if (!isObject(entrantList)) {
     check(
       false,
       "The proof has an entrant list",
@@ -474,15 +511,67 @@ export function verifyProof(proof, entrants) {
     );
     return checks;
   }
+  // Every pick and roll comes from the random value, but the list's root
+  // doesn't, so a missing one still leaves the root to check.
+  const entropy = proof.entropy?.value;
+  const entropyProblem =
+    fieldProblem(entropy, "entropy.value", "string") ||
+    (HASH.test(entropy) ? "" : "entropy.value isn't 32 bytes of hex");
+  if (entropyProblem) {
+    check(
+      false,
+      "The proof has its random value",
+      `${entropyProblem}, so no pick or roll was checked`
+    );
+  }
+  const badPositions = proof.results
+    .map((r, i) =>
+      fieldProblem(r.position, `results[${i}].position`, "whole number")
+    )
+    .filter(Boolean);
+  if (badPositions.length > 0) {
+    check(false, "Every result has a position", badPositions.join(", "));
+  }
   // The winners are the results in slot order, picked from the list.
   const winners = [...proof.results]
     .sort((a, b) => a.position - b.position)
     .map(r => r.winner);
-  checkEntrants(proof, entrants, check, resultAt);
+  checkEntrants(proof, entrants, check, resultAt, !entropyProblem);
   check(
     proof.results.length === winners.length,
     `One result per winner (${proof.results.length})`
   );
+  if (!entropyProblem) checkRolls(proof, check, resultAt, winners);
+
+  const { lockedAt } = entrantList;
+  const { revealedAt, provider, requestId } = proof.entropy ?? {};
+  if (lockedAt && revealedAt) {
+    check(
+      new Date(lockedAt) < new Date(revealedAt),
+      "The list was locked before the random value was revealed",
+      "by Prizerail's own timestamps"
+    );
+  }
+  if (provider === "mock") {
+    check(
+      null,
+      "Random value source: test randomness",
+      "made by Prizerail in a test environment, so it can't be checked independently"
+    );
+  } else {
+    check(
+      null,
+      `Random value source: ${provider}${requestId ? ` request ${requestId}` : ""}`,
+      "this script doesn't look up the request onchain yet; check it on the chain's explorer"
+    );
+  }
+  return checks;
+}
+
+/** Each winner's random value, roll and prize. */
+function checkRolls(proof, check, resultAt, winners) {
+  const entropy = proof.entropy.value;
+  const { denominator, tiers } = proof.prizeTable;
   // Every winner's roll first, since the top-tier rule looks across them.
   const rolled = winners.map((_, position) => {
     const randomValue = winnerRandomValue(
@@ -508,64 +597,59 @@ export function verifyProof(proof, entrants) {
     const amountCents = tier === -1 ? null : tiers[tier].amountCents;
     const demoted = rolled[position].tier === 0 && tier === 1;
     const problems = [
-      randomValue !== result.randomValue.toLowerCase() &&
-        `random value should be ${randomValue}`,
-      roll !== result.roll && `roll should be ${roll}`,
-      amountCents !== result.amountCents &&
-        `prize should be ${amountCents === null ? "none" : usd(amountCents)}`,
+      fieldProblem(winner, "winner", "string"),
+      fieldProblem(result.randomValue, "randomValue", "string") ||
+        (randomValue !== result.randomValue.toLowerCase() &&
+          `random value should be ${randomValue}`),
+      fieldProblem(result.roll, "roll", "whole number") ||
+        (roll !== result.roll && `roll should be ${roll}`),
+      fieldProblem(result.amountCents, "amountCents", "whole number") ||
+        (amountCents !== result.amountCents &&
+          `prize should be ${amountCents === null ? "none" : usd(amountCents)}`),
     ].filter(Boolean);
+    const wins = Number.isInteger(result.amountCents)
+      ? usd(result.amountCents)
+      : "an unstated prize";
     check(
       problems.length === 0,
-      `${label}: roll ${roll.toLocaleString("en-US")} wins ${usd(result.amountCents)}${demoted ? ", the second prize, since another winner with a lower random value kept the top one" : ""}`,
+      `${label}: roll ${roll.toLocaleString("en-US")} wins ${wins}${demoted ? ", the second prize, since another winner with a lower random value kept the top one" : ""}`,
       problems.join(", ") || undefined
     );
   }
-
-  const { lockedAt } = entrantList;
-  const { revealedAt, provider, requestId } = proof.entropy;
-  if (lockedAt && revealedAt) {
-    check(
-      new Date(lockedAt) < new Date(revealedAt),
-      "The list was locked before the random value was revealed",
-      "by Prizerail's own timestamps"
-    );
-  }
-  if (provider === "mock") {
-    check(
-      null,
-      "Random value source: test randomness",
-      "made by Prizerail in a test environment, so it can't be checked independently"
-    );
-  } else {
-    check(
-      null,
-      `Random value source: ${provider}${requestId ? ` request ${requestId}` : ""}`,
-      "this script doesn't look up the request onchain yet; check it on the chain's explorer"
-    );
-  }
-  return checks;
 }
 
-/** The entrant list's checks: its root, then every pick. */
-function checkEntrants(proof, entrants, check, results) {
+/**
+ * The entrant list's checks: its root, then every pick, if the proof has a
+ * usable random value (`picksCheckable`).
+ */
+function checkEntrants(proof, entrants, check, results, picksCheckable) {
   const { root, count, totalWeight, winnersRequested } = proof.entrantList;
   // Proofs from before the setting have no field, and those draws took
   // each winner out.
   const repeat = proof.entrantList.repeatWinners === true;
-  if (
-    typeof root !== "string" ||
-    !HASH.test(root) ||
-    !Number.isInteger(count) ||
-    count < 1 ||
-    !Number.isSafeInteger(totalWeight) ||
-    !Number.isInteger(winnersRequested) ||
-    winnersRequested < 1 ||
-    winnersRequested > MAX_WINNERS
-  ) {
+  const fieldProblems = [
+    fieldProblem(root, "entrantList.root", "string") ||
+      (HASH.test(root) ? "" : "entrantList.root isn't 32 bytes of hex"),
+    fieldProblem(count, "entrantList.count", "whole number") ||
+      (count < 1 ? "entrantList.count is below 1" : ""),
+    fieldProblem(totalWeight, "entrantList.totalWeight", "whole number") ||
+      (Number.isSafeInteger(totalWeight)
+        ? ""
+        : "entrantList.totalWeight is too big"),
+    fieldProblem(
+      winnersRequested,
+      "entrantList.winnersRequested",
+      "whole number"
+    ) ||
+      (winnersRequested < 1 || winnersRequested > MAX_WINNERS
+        ? `entrantList.winnersRequested isn't from 1 to ${MAX_WINNERS}`
+        : ""),
+  ].filter(Boolean);
+  if (fieldProblems.length > 0) {
     check(
       false,
       "The proof's entrant list fields are well formed",
-      "root must be 32 bytes of hex, count and totalWeight whole numbers, and winnersRequested from 1 to 500"
+      fieldProblems.join(", ")
     );
     return;
   }
@@ -641,6 +725,7 @@ function checkEntrants(proof, entrants, check, results) {
     "Entrant list root matches the list",
     computed === root.toLowerCase() ? undefined : `computed ${computed}`
   );
+  if (!picksCheckable) return;
   const picks = selectWinners(
     proof.entropy.value,
     proof.campaign.id,
@@ -658,13 +743,17 @@ function checkEntrants(proof, entrants, check, results) {
     }
     const entry = list.at(pick.entrantIndex);
     const problems = [
-      pick.selectionValue !== result.selectionValue?.toLowerCase() &&
-        `selection value should be ${pick.selectionValue}`,
-      pick.pick !== result.pick && `pick should be ${pick.pick}`,
-      pick.entrantIndex !== result.entrantPosition &&
-        `winner should be entrant ${pick.entrantIndex}`,
-      winnerHash(result.winner) !== entry[0].toLowerCase() &&
-        `${result.winner} doesn't hash to entrant ${pick.entrantIndex}`,
+      fieldProblem(result.selectionValue, "selectionValue", "string") ||
+        (pick.selectionValue !== result.selectionValue.toLowerCase() &&
+          `selection value should be ${pick.selectionValue}`),
+      fieldProblem(result.pick, "pick", "whole number") ||
+        (pick.pick !== result.pick && `pick should be ${pick.pick}`),
+      fieldProblem(result.entrantPosition, "entrantPosition", "whole number") ||
+        (pick.entrantIndex !== result.entrantPosition &&
+          `winner should be entrant ${pick.entrantIndex}`),
+      fieldProblem(result.winner, "winner", "string") ||
+        (winnerHash(result.winner) !== entry[0].toLowerCase() &&
+          `${result.winner} doesn't hash to entrant ${pick.entrantIndex}`),
     ].filter(Boolean);
     check(
       problems.length === 0,
@@ -763,16 +852,17 @@ async function main() {
   }
   const proof = await readJson(source);
   let entrants;
-  if (proof.entrantList) {
+  if (proof?.entrantList) {
+    const listUrl = proof.entrantList.url;
     const listSource =
       process.argv[3] ??
-      (/^https?:\/\//.test(source)
-        ? new URL(proof.entrantList.url, source).href
+      (/^https?:\/\//.test(source) && typeof listUrl === "string"
+        ? new URL(listUrl, source).href
         : undefined);
     if (listSource) entrants = await readEntrants(listSource);
   }
   console.log(
-    `\n${proof.campaign.name}, draw of ${proof.drawing.drawAt} (${proof.drawing.id})\n`
+    `\n${proof?.campaign?.name ?? "Unnamed campaign"}, draw of ${proof?.drawing?.drawAt ?? "an unknown time"} (${proof?.drawing?.id ?? "no draw ID"})\n`
   );
   const checks = verifyProof(proof, entrants);
   for (const { ok, label, detail } of checks) {
