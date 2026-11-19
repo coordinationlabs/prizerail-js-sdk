@@ -117,7 +117,7 @@ export type Drawing = {
   status: DrawingStatus;
   /**
    * The drawing's public page, by its date link, like
-   * `https://prizerail.com/campaigns/your-app/draws/2026-11-22`. Null until
+   * `https://www.prizerail.com/campaigns/your-app/draws/2026-11-22`. Null until
    * it's settled. Optional for servers from before November 19, 2026.
    */
   url?: string | null;
