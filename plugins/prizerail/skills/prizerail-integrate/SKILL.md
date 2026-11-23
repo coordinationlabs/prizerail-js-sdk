@@ -182,6 +182,26 @@ const found = await campaign.drawings.entrant(drawingId, entrantId)
 - `position` is `null` until the drawing locks. In a guarantee draw (`drawing.kind` is `"guarantee"`) everyone has 1 entry, `position` is set from the start, and `receivedAt` is when the guarantee draw was made.
 - Plain HTTP: `GET {base}/campaigns/{slug}/drawings/{id}/entrant?entrantId=…`, URL-encoded, so a `+` goes as `%2B`. A bare `+` reads as a space, and the lookup finds no one.
 
+## 10. When a winner must share their win
+
+A winner whose prizes in one draw add up to $1,000 or more shares their win before their prize is paid: a photo with their first name, or a post on X, through their own form. Prizerail holds the prize until it's approved. The app sends each such winner their link, so nobody has to be watching when a big prize lands.
+
+Each settled winner has `publicity`: `required`, `status` and `url`. Read it from `campaign.drawings.latest()` or `campaign.drawings.get(drawingId)` (`winners[].publicity`), or for one user from `campaign.drawings.entrant(drawingId, entrantId)` (top-level `publicity`, `null` if they didn't win).
+
+```ts
+const found = await campaign.drawings.entrant(drawingId, entrantId)
+if (found.publicity?.required && found.publicity.url) {
+  // Show this user only: "To get your prize, share your win here", with the link.
+}
+```
+
+- Decide with `required`, not by comparing the amount to $1,000.
+- `url` is that winner's own form. Show it to them alone, never on a public page or in a shared feed.
+- `url` turns `null` once their publicity is approved, or if their prize was closed. Stop prompting then.
+- `status` is `awaiting`, `in_review` (they sent it and Prizerail is checking), `rejected` (they can open the same link and send it again) or `approved`.
+- Showing the link from the app doesn't mark it as sent in the partner portal, and that's fine.
+- Docs: [Winner publicity](https://docs.prizerail.com/campaigns/winner-publicity).
+
 ## Checklist before handing back
 
 - [ ] Mode chosen and explained in a comment at the sender
@@ -191,3 +211,4 @@ const found = await campaign.drawings.entrant(drawingId, entrantId)
 - [ ] Set mode: cutoff margin and drawing pinning. Increment mode: `eventId` fixed when the event happens
 - [ ] `entries` sent every time it's used, a whole number from 1 to 4,294,967,295
 - [ ] Tests from section 7
+- [ ] If the app shows winners: each winner with `publicity.required` and a `url` is shown their link, and only them
