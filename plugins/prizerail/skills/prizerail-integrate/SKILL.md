@@ -200,7 +200,7 @@ if (p?.required && p.url) {
   } else if (p.status === "rejected") {
     // "Something needs fixing. Open the same link and send it again", with p.url
   } else if (p.status === "in_review") {
-    // "Thanks, we're checking it", with no link to act on
+    // "Thanks, we're checking it", with p.url to see or change what they sent
   }
 }
 ```
