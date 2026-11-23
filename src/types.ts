@@ -152,6 +152,14 @@ export type Drawing = {
   drawAt: string;
   cutoffAt: string;
   status: DrawingStatus;
+  /**
+   * The drawing's public page, by its date link, like
+   * `https://www.prizerail.com/campaigns/your-app/draws/2026-11-22`. Null until
+   * it's settled. Optional for servers from before November 19, 2026.
+   */
+  url?: string | null;
+  /** The drawing's proof.json. Null until it's settled. */
+  proofUrl?: string | null;
   winnersExpected: number;
   /** Whether one entrant can win several slots in this drawing. */
   repeatWinners?: boolean;
