@@ -17,7 +17,7 @@ export type PayoutKind =
   | "guarantee"
   /** One prize held until the winner's publicity is approved. */
   | "publicity_prize"
-  /** One prize paid straight to a verified winner, on a direct drawing. */
+  /** A transfer straight to a verified winner, on a direct drawing. It can cover several of their prizes. */
   | "direct";
 export type PayoutStatus =
   | "pending"
@@ -138,7 +138,10 @@ export type Payout = {
   to: string;
   txHash: string | null;
   confirmedAt: string | null;
-  /** The winner a large-prize or guarantee payout is for. Null for the lump sum. */
+  /**
+   * The winner a large-prize, publicity-prize or guarantee payout is for. Null
+   * for the lump sum and for a direct payout.
+   */
   winnerPosition: number | null;
 };
 
@@ -223,6 +226,11 @@ export type EntrantSlot = {
   position: number;
   amountCents: number;
   heldForManualPayout: boolean;
+  /**
+   * The person's publicity, on a direct drawing only. The top-level
+   * `EntrantLookup.publicity` is there on every drawing.
+   */
+  publicity?: WinnerPublicity;
 };
 
 export type DrawingsPage = {

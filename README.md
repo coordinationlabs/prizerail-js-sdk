@@ -109,10 +109,12 @@ To answer a user who asks whether their entries counted, look them up in one dra
 
 ```ts
 const found = await campaign.drawings.entrant(drawingId, entrantId)
-// { entered, entries, position, receivedAt, drawn, winner, winners, totalCents }
+// { entered, entries, position, receivedAt, drawn, winner, winners, totalCents, publicity }
 ```
 
 `entered` is false, not an error, for someone who isn't in the drawing. `winner` stays null for everyone until `drawn` is true. In a campaign with repeat winners one entrant can win several slots, so credit users from `winners` or `totalCents`, not `winner` alone. See [Look up an entrant](https://docs.prizerail.com/api/drawings#look-up-an-entrant).
+
+A winner whose prizes in one draw add up to $1,000 or more must share their win before it's paid. `publicity` says so (`required`), where it stands (`status`), and gives `url`, that winner's own form, until it's approved. It's on each of a drawing's `winners[]` and at the top level of `drawings.entrant()`. Keep `url` on your server and send it only to that winner, never in a list a browser can see. See [Winner publicity](https://docs.prizerail.com/campaigns/winner-publicity).
 
 ## Draw now, in the sandbox
 

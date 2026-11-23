@@ -174,7 +174,7 @@ Look them up in that drawing rather than paging `entries.all()`, from the server
 ```ts
 const entrantId = await hashEntrant(user.id, process.env.ENTRANT_ID_KEY!)
 const found = await campaign.drawings.entrant(drawingId, entrantId)
-// { drawing, entrantId, entered, entries, position, receivedAt, drawn, winner }
+// { drawing, entrantId, entered, entries, position, receivedAt, drawn, winner, winners, totalCents, publicity }
 ```
 
 - `entered: false` is an answer, not an error: entries sent after the cutoff went to the next drawing, and ones that failed to send aren't anywhere. Check the next drawing and the sender's logs.
@@ -186,19 +186,28 @@ const found = await campaign.drawings.entrant(drawingId, entrantId)
 
 A winner whose prizes in one draw add up to $1,000 or more shares their win before their prize is paid: a photo with their first name, or a post on X, through their own form. Prizerail holds the prize until it's approved. The app sends each such winner their link, so nobody has to be watching when a big prize lands.
 
-Each settled winner has `publicity`: `required`, `status` and `url`. Read it from `campaign.drawings.latest()` or `campaign.drawings.get(drawingId)` (`winners[].publicity`), or for one user from `campaign.drawings.entrant(drawingId, entrantId)` (top-level `publicity`, `null` if they didn't win).
+Each settled winner has `publicity`: `required`, `status` and `url`. It's on every winner of `campaign.drawings.get(drawingId)` (`winners[].publicity`), and for one user at the top level of `campaign.drawings.entrant(drawingId, entrantId)` (`null` if they didn't win).
+
+**Which drawings to check.** Not just the newest: a user can win at 14:00 and open the app after two more draws. A drawing with a prize still held stays `settled` instead of becoming `paid`, so walk `campaign.drawings.all({ status: "settled" })`, or keep the `drawingId` of each winner with `publicity.required` when their draw settles and look them up until `url` is `null`.
 
 ```ts
+// On the server, for the signed-in user only.
 const found = await campaign.drawings.entrant(drawingId, entrantId)
-if (found.publicity?.required && found.publicity.url) {
-  // Show this user only: "To get your prize, share your win here", with the link.
+const p = found.publicity
+if (p?.required && p.url) {
+  if (p.status === "awaiting") {
+    // "To get your prize, share your win here", with p.url
+  } else if (p.status === "rejected") {
+    // "Something needs fixing. Open the same link and send it again", with p.url
+  } else if (p.status === "in_review") {
+    // "Thanks, we're checking it", with no link to act on
+  }
 }
 ```
 
+- **Keep the link on the server.** `url` is that winner's own form: anyone holding it can send a photo as them. Call these from the server like every call with the key. Before a drawing or its winners go to a browser, a shared cache or logs, remove `publicity` from every winner, and send a `url` only in a response to the signed-in user whose entrant id it belongs to.
 - Decide with `required`, not by comparing the amount to $1,000.
-- `url` is that winner's own form. Show it to them alone, never on a public page or in a shared feed.
 - `url` turns `null` once their publicity is approved, or if their prize was closed. Stop prompting then.
-- `status` is `awaiting`, `in_review` (they sent it and Prizerail is checking), `rejected` (they can open the same link and send it again) or `approved`.
 - Showing the link from the app doesn't mark it as sent in the partner portal, and that's fine.
 - Docs: [Winner publicity](https://docs.prizerail.com/campaigns/winner-publicity).
 
@@ -211,4 +220,4 @@ if (found.publicity?.required && found.publicity.url) {
 - [ ] Set mode: cutoff margin and drawing pinning. Increment mode: `eventId` fixed when the event happens
 - [ ] `entries` sent every time it's used, a whole number from 1 to 4,294,967,295
 - [ ] Tests from section 7
-- [ ] If the app shows winners: each winner with `publicity.required` and a `url` is shown their link, and only them
+- [ ] If the app handles winners: each winner with `publicity.required` and a `url` gets their link from the server, in a response to them alone. No drawing or winner list sent to a browser, cache or log carries `publicity`
