@@ -11,13 +11,22 @@ export type DrawingStatus =
   /** No entries by the cutoff, so closed without a draw. */
   | "skipped";
 export type DrawingKind = "regular" | "guarantee";
-export type PayoutKind = "lump_sum" | "large_prize" | "guarantee";
+export type PayoutKind =
+  | "lump_sum"
+  | "large_prize"
+  | "guarantee"
+  /** One prize held until the winner's publicity is approved. */
+  | "publicity_prize"
+  /** A transfer straight to a verified winner, on a direct drawing. It can cover several of their prizes. */
+  | "direct";
 export type PayoutStatus =
   | "pending"
   | "submitted"
   | "confirmed"
   | "failed"
-  | "held_manual";
+  | "held_manual"
+  /** Waiting for the winner's publicity to be approved. */
+  | "held_publicity";
 export type GuaranteeStatus = "not_needed" | "drawn" | "skipped";
 
 export type PrizeTier = {
@@ -82,6 +91,29 @@ export type Campaign = {
 
 export type DrawingRef = { id: string; drawAt: string; cutoffAt: string };
 
+/** Where a winner's publicity stands. */
+export type PublicityStatus =
+  | "awaiting"
+  | "in_review"
+  | "approved"
+  | "rejected";
+
+/**
+ * Whether a winner must share their win before their prize is paid, where
+ * that stands, and the link to send them. A winner whose prizes in one draw
+ * add up to $1,000 or more is asked. Use `required`, not the amount.
+ */
+export type WinnerPublicity = {
+  required: boolean;
+  /** Null when it isn't required. */
+  status: PublicityStatus | null;
+  /**
+   * The winner's own publicity form, to show only to them, until it's
+   * approved or their prize is closed. Then null.
+   */
+  url: string | null;
+};
+
 export type Winner = {
   position: number;
   winner: string;
@@ -92,6 +124,8 @@ export type Winner = {
   roll?: number;
   amountCents?: number;
   heldForManualPayout?: boolean;
+  /** Set once the drawing settles. Absent from servers before it shipped. */
+  publicity?: WinnerPublicity;
 };
 
 export type Payout = {
@@ -104,7 +138,10 @@ export type Payout = {
   to: string;
   txHash: string | null;
   confirmedAt: string | null;
-  /** The winner a large-prize or guarantee payout is for. Null for the lump sum. */
+  /**
+   * The winner a large-prize, publicity-prize or guarantee payout is for. Null
+   * for the lump sum and for a direct payout.
+   */
   winnerPosition: number | null;
 };
 
@@ -177,6 +214,11 @@ export type EntrantLookup = {
   winners?: EntrantSlot[];
   /** What they won in all, or null if they didn't win. */
   totalCents?: number | null;
+  /**
+   * Whether they must share their win before it's paid, and the link to send
+   * them. Null if they didn't win. Absent from servers before it shipped.
+   */
+  publicity?: WinnerPublicity | null;
 };
 
 /** One winning slot in `drawings.entrant()`. */
@@ -184,6 +226,11 @@ export type EntrantSlot = {
   position: number;
   amountCents: number;
   heldForManualPayout: boolean;
+  /**
+   * The person's publicity, on a direct drawing only. The top-level
+   * `EntrantLookup.publicity` is there on every drawing.
+   */
+  publicity?: WinnerPublicity;
 };
 
 export type DrawingsPage = {

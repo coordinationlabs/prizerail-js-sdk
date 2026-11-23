@@ -174,13 +174,42 @@ Look them up in that drawing rather than paging `entries.all()`, from the server
 ```ts
 const entrantId = await hashEntrant(user.id, process.env.ENTRANT_ID_KEY!)
 const found = await campaign.drawings.entrant(drawingId, entrantId)
-// { drawing, entrantId, entered, entries, position, receivedAt, drawn, winner }
+// { drawing, entrantId, entered, entries, position, receivedAt, drawn, winner, winners, totalCents, publicity }
 ```
 
 - `entered: false` is an answer, not an error: entries sent after the cutoff went to the next drawing, and ones that failed to send aren't anywhere. Check the next drawing and the sender's logs.
 - `winner` is `null` for everyone until `drawn` is true, so check `drawn` before reading a `null` winner as a loss. A `skipped` drawing (`drawing.status`) was never drawn, so there's no winner to wait for.
 - `position` is `null` until the drawing locks. In a guarantee draw (`drawing.kind` is `"guarantee"`) everyone has 1 entry, `position` is set from the start, and `receivedAt` is when the guarantee draw was made.
 - Plain HTTP: `GET {base}/campaigns/{slug}/drawings/{id}/entrant?entrantId=…`, URL-encoded, so a `+` goes as `%2B`. A bare `+` reads as a space, and the lookup finds no one.
+
+## 10. When a winner must share their win
+
+A winner whose prizes in one draw add up to $1,000 or more shares their win before their prize is paid: a photo with their first name, or a post on X, through their own form. Prizerail holds the prize until it's approved. The app sends each such winner their link, so nobody has to be watching when a big prize lands.
+
+Each settled winner has `publicity`: `required`, `status` and `url`. It's on every winner of `campaign.drawings.get(drawingId)` (`winners[].publicity`), and for one user at the top level of `campaign.drawings.entrant(drawingId, entrantId)` (`null` if they didn't win).
+
+**Which drawings to check.** Not just the newest: a user can win at 14:00 and open the app after two more draws. A drawing with a prize still held stays `settled` instead of becoming `paid`, so walk `campaign.drawings.all({ status: "settled" })`, or keep the `drawingId` of each winner with `publicity.required` when their draw settles and look them up until `url` is `null`.
+
+```ts
+// On the server, for the signed-in user only.
+const found = await campaign.drawings.entrant(drawingId, entrantId)
+const p = found.publicity
+if (p?.required && p.url) {
+  if (p.status === "awaiting") {
+    // "To get your prize, share your win here", with p.url
+  } else if (p.status === "rejected") {
+    // "Something needs fixing. Open the same link and send it again", with p.url
+  } else if (p.status === "in_review") {
+    // "Thanks, we're checking it", with no link to act on
+  }
+}
+```
+
+- **Keep the link on the server.** `url` is that winner's own form: anyone holding it can send a photo as them. Call these from the server like every call with the key. Before a drawing or its winners go to a browser, a shared cache or logs, remove `publicity` from every winner, and send a `url` only in a response to the signed-in user whose entrant id it belongs to.
+- Decide with `required`, not by comparing the amount to $1,000.
+- `url` turns `null` once their publicity is approved, or if their prize was closed. Stop prompting then.
+- Showing the link from the app doesn't mark it as sent in the partner portal, and that's fine.
+- Docs: [Winner publicity](https://docs.prizerail.com/campaigns/winner-publicity).
 
 ## Checklist before handing back
 
@@ -191,3 +220,4 @@ const found = await campaign.drawings.entrant(drawingId, entrantId)
 - [ ] Set mode: cutoff margin and drawing pinning. Increment mode: `eventId` fixed when the event happens
 - [ ] `entries` sent every time it's used, a whole number from 1 to 4,294,967,295
 - [ ] Tests from section 7
+- [ ] If the app handles winners: each winner with `publicity.required` and a `url` gets their link from the server, in a response to them alone. No drawing or winner list sent to a browser, cache or log carries `publicity`
