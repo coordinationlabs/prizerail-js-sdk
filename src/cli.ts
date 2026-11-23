@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { checkCampaign } from "./check.js";
 import { Prizerail, VERSION } from "./client.js";
 import { type Check, type VerifyResult, verifyDraw } from "./verify.js";
+import { show } from "./verify-draw.mjs";
 
 const USAGE = `prizerail ${VERSION}
 
@@ -41,7 +42,7 @@ function print(result: VerifyResult) {
   const { proof, checks } = result;
   // A malformed proof may lack these, and its failed checks still print.
   console.log(
-    `\n${proof?.campaign?.name ?? "Unknown campaign"}, draw of ${proof?.drawing?.drawAt ?? "unknown date"} (${proof?.drawing?.id ?? "unknown drawing"})\n`
+    `\n${show(proof?.campaign?.name ?? "Unknown campaign")}, draw of ${show(proof?.drawing?.drawAt ?? "unknown date")} (${show(proof?.drawing?.id ?? "unknown drawing")})\n`
   );
   return printChecks(checks, "Every result follows from the inputs.");
 }

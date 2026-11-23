@@ -5,6 +5,7 @@ import * as script from "../src/verify-draw.mjs";
 import {
   type EntrantRow,
   entrantsRoot,
+  show,
   verifyProof,
   winnerHash,
 } from "../src/verify-draw.mjs";
@@ -287,6 +288,35 @@ describe("verifyProof with missing or malformed values", () => {
       },
     ],
     [
+      "a lock time that isn't ISO",
+      "entrantList.lockedAt is missing or isn't a time",
+      (p: Mutable) => {
+        p.entrantList.lockedAt = "0";
+      },
+    ],
+    [
+      "a lock time without a zone",
+      "entrantList.lockedAt is missing or isn't a time",
+      (p: Mutable) => {
+        p.entrantList.lockedAt = "2026-11-04T23:55:00";
+      },
+    ],
+    [
+      "a lock date that doesn't exist",
+      "entrantList.lockedAt is missing or isn't a time",
+      (p: Mutable) => {
+        p.entrantList.lockedAt = "2026-02-30T00:00:00Z";
+      },
+    ],
+    [
+      "words the legacy date parser reads as times",
+      "entrantList.lockedAt is missing or isn't a time",
+      (p: Mutable) => {
+        p.entrantList.lockedAt = "foo 1";
+        p.entropy.revealedAt = "foo 2";
+      },
+    ],
+    [
       "a list locked after the reveal",
       "by Prizerail's own timestamps",
       (p: Mutable) => {
@@ -311,8 +341,34 @@ describe("verifyProof with missing or malformed values", () => {
       (p: Mutable) => (p.prizeTable.denominator = { toString: 1 }),
     ],
     ["a lock time", (p: Mutable) => (p.entrantList.lockedAt = { toString: 1 })],
+    [
+      "a format, with a bad campaign id",
+      (p: Mutable) => {
+        p.format = { toString: 1 };
+        p.campaign.id = 5;
+      },
+    ],
+    [
+      "a format, with no entrant list",
+      (p: Mutable) => {
+        p.format = { toString: 1 };
+        p.entrantList = null;
+      },
+    ],
   ])("fails %s that can't be turned into text, without throwing", (_, edit) => {
     expect(failedAfter(edit).length).toBeGreaterThan(0);
+  });
+
+  it("escapes control characters, so a proof can't print a fake result", () => {
+    expect(show("ok\u001b[8m\n\u009bx")).toBe("ok\\u001b[8m\\u000a\\u009bx");
+    expect(show("Ünïcödé ✓")).toBe("Ünïcödé ✓");
+  });
+
+  it("fails a proof that is null, without throwing", async () => {
+    const result = await verifyDraw(
+      null as unknown as Parameters<typeof verifyDraw>[0]
+    );
+    expect(result.checks.filter(c => c.ok === false).length).toBeGreaterThan(0);
   });
 
   it("fails a repeat-winners setting that isn't true or false", () => {

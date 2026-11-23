@@ -43,6 +43,11 @@
  *    it, the one with the lowest random value keeps it and the others get
  *    the second prize. Only the top tier works this way.
  *
+ * It also checks, by Prizerail's own timestamps, that the entrant list was
+ * locked (entrantList.lockedAt) before the random value was revealed
+ * (entropy.revealedAt). Both are required, as UTC times like
+ * 2026-11-05T00:00:00.000Z.
+ *
  * The list comes from the proof's entrantList.url, in pages, or a file:
  *
  *   node verify-draw.mjs <proof.json> [entrants.json file or link]
@@ -415,9 +420,20 @@ const isObject = value => typeof value === "object" && value !== null;
 /**
  * A proof value as text for a check's label or detail, whatever JSON it is.
  * Turning an arbitrary object into a string can throw, so this never does.
+ * Control characters are escaped, so a proof can't move the cursor, hide
+ * lines or print a fake result in the terminal.
  */
-const show = value => {
-  if (typeof value === "string") return value;
+export const show = value => {
+  if (typeof value === "string") {
+    return [...value]
+      .map(c => {
+        const code = c.codePointAt(0);
+        return code < 0x20 || (code >= 0x7f && code < 0xa0)
+          ? `\\u${code.toString(16).padStart(4, "0")}`
+          : c;
+      })
+      .join("");
+  }
   try {
     return JSON.stringify(value) ?? String(value);
   } catch {
@@ -464,7 +480,7 @@ export function verifyProof(proof, entrants) {
     check(
       false,
       "The proof names its campaign ID and drawing number",
-      `${keyProblems.join(", ")}. This script reads ${proof.format ?? "an unknown format"} proofs only if they have both`
+      `${keyProblems.join(", ")}. This script reads ${show(proof.format ?? "an unknown format")} proofs only if they have both`
     );
     return checks;
   }
@@ -523,7 +539,7 @@ export function verifyProof(proof, entrants) {
     check(
       false,
       "The proof has an entrant list",
-      `not an entrants draw proof (${proof.format ?? "unknown format"}). This script checks prizerail-draw-proof/3 proofs`
+      `not an entrants draw proof (${show(proof.format ?? "unknown format")}). This script checks prizerail-draw-proof/3 proofs`
     );
     return checks;
   }
@@ -562,9 +578,15 @@ export function verifyProof(proof, entrants) {
   const { lockedAt } = entrantList;
   const { revealedAt, provider, requestId } = proof.entropy ?? {};
   // Both times are required: a proof without one could hide a list that
-  // was locked after the random value was known.
+  // was locked after the random value was known. Only UTC times count, so
+  // the result can't depend on the verifier's time zone, and a date that
+  // doesn't exist, like 30 February, doesn't roll over into March.
   const isTime = value =>
-    typeof value === "string" && !Number.isNaN(Date.parse(value));
+    typeof value === "string" &&
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(value) &&
+    !Number.isNaN(Date.parse(value)) &&
+    new Date(Date.parse(value)).toISOString().slice(0, 19) ===
+      value.slice(0, 19);
   check(
     isTime(lockedAt) &&
       isTime(revealedAt) &&

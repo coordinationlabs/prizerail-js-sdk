@@ -6,6 +6,8 @@
 export type Check = { ok: boolean | null; label: string; detail?: string };
 /** [index, keccak256(entrantId), weight] */
 export type EntrantRow = [number, string, number];
+/** A proof value as printable text. Never throws, and escapes control characters. */
+export function show(value: unknown): string;
 export function keccak256(bytes: Uint8Array): string;
 export function winnerHash(winner: string): string;
 export function entrantsRoot(list: [string, number][]): string;
