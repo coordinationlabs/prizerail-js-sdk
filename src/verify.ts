@@ -92,7 +92,7 @@ export async function verifyDraw(
       : source;
   let rows = Array.isArray(entrants) ? entrants : undefined;
   // A list the caller names wins. Otherwise the proof's own link, if any.
-  const listUrl = proof.entrantList?.url;
+  const listUrl = proof?.entrantList?.url;
   const listSource =
     typeof entrants === "string"
       ? entrants
