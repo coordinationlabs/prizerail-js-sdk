@@ -84,9 +84,13 @@ function honestDraw(ids: string[], winnersRequested: number, repeat: boolean) {
       totalWeight: list.reduce((n, [, w]) => n + w, 0),
       winnersRequested,
       repeatWinners: repeat,
-      lockedAt: null,
+      lockedAt: "2026-11-04T23:55:00Z",
     },
-    entropy: { provider: "mock", value: ENTROPY },
+    entropy: {
+      provider: "mock",
+      value: ENTROPY,
+      revealedAt: "2026-11-05T00:00:05Z",
+    },
     prizeTable: { denominator: 100, tiers: TIERS },
     results: picks.map((p, position) => ({
       position,
@@ -235,5 +239,98 @@ describe("verifyProof with repeat winners", () => {
     expect(proof.results).toHaveLength(ids.length);
     const { repeatWinners: _, ...older } = proof.entrantList;
     expect(failures({ ...proof, entrantList: older }, entrants)).toEqual([]);
+  });
+});
+
+describe("verifyProof with missing or malformed values", () => {
+  const ids = ["ana", "bo", "cy", "di", "ed"];
+  const LOCK = "The list was locked before the random value was revealed";
+  type Mutable = Record<string, any>;
+  const failedAfter = (edit: (p: Mutable) => void) => {
+    const { proof, entrants } = honestDraw(ids, 3, false);
+    const p = structuredClone(proof) as Mutable;
+    edit(p);
+    let failed: { label: string; detail?: string }[] = [];
+    expect(() => {
+      failed = failures(p, entrants);
+    }).not.toThrow();
+    return failed;
+  };
+
+  it("passes the honest draw, lock-before-reveal check included", () => {
+    const { proof, entrants } = honestDraw(ids, 3, false);
+    const checks = verifyProof(proof, entrants);
+    expect(checks.filter(c => c.ok === false)).toEqual([]);
+    expect(checks.find(c => c.label === LOCK)?.ok).toBe(true);
+  });
+
+  it.each([
+    [
+      "a missing reveal time",
+      "entropy.revealedAt is missing or isn't a time",
+      (p: Mutable) => {
+        delete p.entropy.revealedAt;
+      },
+    ],
+    [
+      "a null lock time",
+      "entrantList.lockedAt is missing or isn't a time",
+      (p: Mutable) => {
+        p.entrantList.lockedAt = null;
+      },
+    ],
+    [
+      "a lock time that isn't a string",
+      "entrantList.lockedAt is missing or isn't a time",
+      (p: Mutable) => {
+        p.entrantList.lockedAt = true;
+      },
+    ],
+    [
+      "a list locked after the reveal",
+      "by Prizerail's own timestamps",
+      (p: Mutable) => {
+        p.entrantList.lockedAt = "2026-11-05T01:00:00Z";
+      },
+    ],
+  ])("fails the lock-before-reveal check for %s", (_, detail, edit) => {
+    const failed = failedAfter(edit);
+    expect(failed.map(c => c.label)).toEqual([LOCK]);
+    expect(failed[0].detail).toBe(detail);
+  });
+
+  it.each([
+    ["a winner", (p: Mutable) => (p.results[0].winner = { toString: 1 })],
+    ["a position", (p: Mutable) => (p.results[0].position = { toString: 1 })],
+    [
+      "a tier weight",
+      (p: Mutable) => (p.prizeTable.tiers[0].weight = { toString: 1 }),
+    ],
+    [
+      "a denominator",
+      (p: Mutable) => (p.prizeTable.denominator = { toString: 1 }),
+    ],
+    ["a lock time", (p: Mutable) => (p.entrantList.lockedAt = { toString: 1 })],
+  ])("fails %s that can't be turned into text, without throwing", (_, edit) => {
+    expect(failedAfter(edit).length).toBeGreaterThan(0);
+  });
+
+  it("fails a repeat-winners setting that isn't true or false", () => {
+    const failed = failedAfter(p => {
+      p.entrantList.repeatWinners = "true";
+    });
+    expect(failed.map(c => c.detail).join("\n")).toContain(
+      "entrantList.repeatWinners isn't true or false"
+    );
+  });
+
+  it("fails an entrant list that isn't a list, without throwing", () => {
+    const { proof } = honestDraw(ids, 3, false);
+    for (const bad of [{}, "x"]) {
+      const labels = verifyProof(proof, bad as unknown as EntrantRow[])
+        .filter(c => c.ok === false)
+        .map(c => c.label);
+      expect(labels).toContain("Entrant list loaded");
+    }
   });
 });

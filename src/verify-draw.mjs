@@ -413,6 +413,22 @@ function fieldProblem(value, field, want) {
 const isObject = value => typeof value === "object" && value !== null;
 
 /**
+ * A proof value as text for a check's label or detail, whatever JSON it is.
+ * Turning an arbitrary object into a string can throw, so this never does.
+ */
+const show = value => {
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value) ?? String(value);
+  } catch {
+    return "an unreadable value";
+  }
+};
+
+/** A number for arithmetic, or NaN for anything else, so a sum never throws. */
+const num = value => (typeof value === "number" ? value : Number.NaN);
+
+/**
  * Every check on a proof, as { ok, label, detail? }. `ok` is true, false, or
  * null for something worth knowing that the math can't settle.
  */
@@ -470,7 +486,7 @@ export function verifyProof(proof, entrants) {
     );
     return checks;
   }
-  const total = tiers.reduce((n, t) => n + t.weight, 0);
+  const total = tiers.reduce((n, t) => n + num(t.weight), 0);
   let running = 0;
   const tableOk =
     Number.isInteger(denominator) &&
@@ -489,7 +505,7 @@ export function verifyProof(proof, entrants) {
     });
   check(
     tableOk,
-    `Prize table: 2 to ${MAX_TIERS} tiers, weights adding up to ${total.toLocaleString("en-US")} of ${Number(denominator).toLocaleString("en-US")} rolls, top prize first`
+    `Prize table: 2 to ${MAX_TIERS} tiers, weights adding up to ${total.toLocaleString("en-US")} of ${num(denominator).toLocaleString("en-US")} rolls, top prize first`
   );
   // Every prize below comes from the table, so there's nothing more to check.
   if (!tableOk) return checks;
@@ -534,7 +550,7 @@ export function verifyProof(proof, entrants) {
   }
   // The winners are the results in slot order, picked from the list.
   const winners = [...proof.results]
-    .sort((a, b) => a.position - b.position)
+    .sort((a, b) => num(a.position) - num(b.position))
     .map(r => r.winner);
   checkEntrants(proof, entrants, check, resultAt, !entropyProblem);
   check(
@@ -545,13 +561,21 @@ export function verifyProof(proof, entrants) {
 
   const { lockedAt } = entrantList;
   const { revealedAt, provider, requestId } = proof.entropy ?? {};
-  if (lockedAt && revealedAt) {
-    check(
-      new Date(lockedAt) < new Date(revealedAt),
-      "The list was locked before the random value was revealed",
-      "by Prizerail's own timestamps"
-    );
-  }
+  // Both times are required: a proof without one could hide a list that
+  // was locked after the random value was known.
+  const isTime = value =>
+    typeof value === "string" && !Number.isNaN(Date.parse(value));
+  check(
+    isTime(lockedAt) &&
+      isTime(revealedAt) &&
+      Date.parse(lockedAt) < Date.parse(revealedAt),
+    "The list was locked before the random value was revealed",
+    !isTime(lockedAt)
+      ? "entrantList.lockedAt is missing or isn't a time"
+      : !isTime(revealedAt)
+        ? "entropy.revealedAt is missing or isn't a time"
+        : "by Prizerail's own timestamps"
+  );
   if (provider === "mock") {
     check(
       null,
@@ -561,7 +585,7 @@ export function verifyProof(proof, entrants) {
   } else {
     check(
       null,
-      `Random value source: ${provider}${requestId ? ` request ${requestId}` : ""}`,
+      `Random value source: ${show(provider)}${requestId ? ` request ${show(requestId)}` : ""}`,
       "this script doesn't look up the request onchain yet; check it on the chain's explorer"
     );
   }
@@ -587,7 +611,7 @@ function checkRolls(proof, check, resultAt, winners) {
   const finalTiers = applyTopTierRule(rolled);
   for (const [position, winner] of winners.entries()) {
     const result = resultAt.get(position);
-    const label = `Winner ${position} (${winner})`;
+    const label = `Winner ${position} (${show(winner)})`;
     if (!result || result.winner !== winner) {
       check(false, label, "no result for this position and winner");
       continue;
@@ -627,7 +651,11 @@ function checkEntrants(proof, entrants, check, results, picksCheckable) {
   // Proofs from before the setting have no field, and those draws took
   // each winner out.
   const repeat = proof.entrantList.repeatWinners === true;
+  const repeatValue = proof.entrantList.repeatWinners;
   const fieldProblems = [
+    repeatValue === undefined || typeof repeatValue === "boolean"
+      ? ""
+      : "entrantList.repeatWinners isn't true or false",
     fieldProblem(root, "entrantList.root", "string") ||
       (HASH.test(root) ? "" : "entrantList.root isn't 32 bytes of hex"),
     fieldProblem(count, "entrantList.count", "whole number") ||
@@ -664,7 +692,7 @@ function checkEntrants(proof, entrants, check, results, picksCheckable) {
     proof.results.length === expected,
     `${expected} winner${expected === 1 ? "" : "s"}: ${winnersRequested} asked for, from ${count.toLocaleString("en-US")} entrants${repeat ? ", repeat winners allowed" : ""}`
   );
-  if (!entrants) {
+  if (!Array.isArray(entrants)) {
     // The root and the picks are what make an entrants draw checkable, so
     // a run that couldn't load the list hasn't verified the draw.
     check(
@@ -757,7 +785,7 @@ function checkEntrants(proof, entrants, check, results, picksCheckable) {
     ].filter(Boolean);
     check(
       problems.length === 0,
-      `${label}: lands on entrant ${pick.entrantIndex.toLocaleString("en-US")} (${result.winner})`,
+      `${label}: lands on entrant ${pick.entrantIndex.toLocaleString("en-US")} (${show(result.winner)})`,
       problems.join(", ") || undefined
     );
   }
@@ -798,6 +826,9 @@ export async function readEntrants(source, options = {}) {
   let pages = null;
   for (let expected = 1; ; expected++) {
     const page = await readJson(next, options);
+    if (!isObject(page)) {
+      throw new Error(`${next} isn't page ${expected} of the entrant list`);
+    }
     pages ??= page.pages;
     if (
       page.page !== expected ||
@@ -813,6 +844,10 @@ export async function readEntrants(source, options = {}) {
     if (page.format === "prizerail-entrants/1") {
       if (!Number.isInteger(page.from)) {
         throw new Error(`${next} is a /1 page with no "from"`);
+      }
+      const bad = page.entrants.findIndex(row => !Array.isArray(row));
+      if (bad !== -1) {
+        throw new Error(`${next} row ${bad} isn't a list`);
       }
       list.push(...page.entrants.map((row, i) => [page.from + i, ...row]));
     } else {
@@ -862,7 +897,7 @@ async function main() {
     if (listSource) entrants = await readEntrants(listSource);
   }
   console.log(
-    `\n${proof?.campaign?.name ?? "Unnamed campaign"}, draw of ${proof?.drawing?.drawAt ?? "an unknown time"} (${proof?.drawing?.id ?? "no draw ID"})\n`
+    `\n${show(proof?.campaign?.name ?? "Unnamed campaign")}, draw of ${show(proof?.drawing?.drawAt ?? "an unknown time")} (${show(proof?.drawing?.id ?? "no draw ID")})\n`
   );
   const checks = verifyProof(proof, entrants);
   for (const { ok, label, detail } of checks) {
