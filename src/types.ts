@@ -163,6 +163,12 @@ export type Drawing = {
   winnersExpected: number;
   /** Whether one entrant can win several slots in this drawing. */
   repeatWinners?: boolean;
+  /**
+   * Who pays the winners. `partner_wallet`: Prizerail sends the prizes to your
+   * payout wallet and you pay each winner. `direct_winner`: Prizerail pays
+   * each winner itself.
+   */
+  payoutMode?: "partner_wallet" | "direct_winner";
   prizeTable: PrizeTable | null;
   needsAttention: string | null;
   winners: Winner[];

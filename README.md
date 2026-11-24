@@ -166,7 +166,7 @@ A `pr_sandbox_` key checks the sandbox and a `pr_prod_` key production. It exits
 
 ## Skills for coding agents
 
-`plugins/prizerail` is a Claude Code plugin with three skills: integrate Prizerail into an app, check an integration with `prizerail check`, and look up or verify draws. Install it with `/plugin marketplace add coordinationlabs/prizerail-js-sdk` then `/plugin install prizerail@prizerail`. The same skills are served as files at [docs.prizerail.com/ai/assistants](https://docs.prizerail.com/ai/assistants) for other agents.
+`plugins/prizerail` is a Claude Code plugin with four skills: integrate Prizerail into an app, check an integration with `prizerail check`, pay winners from the transfers Prizerail sends, and look up or verify draws. Install it with `/plugin marketplace add coordinationlabs/prizerail-js-sdk` then `/plugin install prizerail@prizerail`. The same skills are served as files at [docs.prizerail.com/ai/assistants](https://docs.prizerail.com/ai/assistants) for other agents.
 
 ## Options
 
