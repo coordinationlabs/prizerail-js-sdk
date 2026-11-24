@@ -158,7 +158,7 @@ Schedule it every few minutes. There are no webhooks, so the job polls.
 
 ## 5. Rules that must be in the code
 
-- **Read every unfinished drawing again, not only recent ones.** `payWinners` does this with `store.unfinished()`. A job that only lists recent drawings never pays a prize that Prizerail releases later. When adding the job to a campaign that is already running, page back once through `campaign.drawings.all({ status })` to pick up older drawings.
+- **Read every unfinished drawing again, not only recent ones.** `payWinners` does this with `store.unfinished()`. A job that only lists recent drawings never pays a prize that Prizerail releases later. The list calls only see the 50 newest drawings of each status, so when adding the job to a campaign that is already running, or after the job has been off long enough for more than 50 draws to pass, page back once through `campaign.drawings.all({ status })` and pay each drawing it returns. Give the developer a command for that catch-up run.
 - **Read both `settled` and `paid` drawings.** A drawing stays `settled` until every transfer has confirmed, held prizes included. A job that waits for `paid` delays every other winner in a draw that has one held prize.
 - **Pay each winner their own `amountCents`.** Never divide the lump sum across all the winners. It carries only the prizes that aren't held.
 - **Decide from each transfer's `status`.** Never from the wallet's balance.
