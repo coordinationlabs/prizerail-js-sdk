@@ -1,13 +1,13 @@
 ---
 name: prizerail-payouts
-description: "Build the job that pays a partner's winners from the transfers Prizerail sends to the partner's payout wallet, in the developer's own codebase. It pays each winner once, when the transfer that carries their prize is confirmed, and handles large prizes, prizes held for winner publicity and guarantee draws, which arrive as separate transfers. Use when someone asks to pay Prizerail winners, distribute prizes, build or fix a payout script or executor, handle a held or large prize, or asks why a winner wasn't paid or was paid twice."
+description: "Build the job that pays a partner's winners from the transfers Prizerail sends to the partner's payout wallet, in the developer's own codebase. It pays each winner once, when the transfer that carries their prize is confirmed, and handles large prizes and prizes held for winner publicity, which arrive as separate transfers, as well as guarantee draws. Use when someone asks to pay Prizerail winners, distribute prizes, build or fix a payout script or executor, handle a held or large prize, or asks why a winner wasn't paid or was paid twice."
 ---
 
 # Pay winners from Prizerail's transfers
 
 When a campaign's prizes go to the partner's payout wallet, Prizerail sends the money and the partner's app pays each winner. This skill builds that job in the developer's codebase. The docs page for it is [Pay your winners](https://docs.prizerail.com/integrations/pay-your-winners).
 
-If a drawing's `payoutMode` is `direct_winner`, Prizerail pays that campaign's winners directly and there is nothing to build. Say so and stop.
+This skill is for drawings whose `payoutMode` is `partner_wallet`. If the campaign's drawings are `direct_winner`, Prizerail pays the winners itself, so don't build a payout job. Tell the developer this skill doesn't apply, and that their side of a direct-payout campaign, sending each winner's payout wallet and ID check, is set up with Prizerail directly. The job below skips any `direct_winner` drawing it meets.
 
 ## 1. Read the repo and ask first
 
@@ -112,6 +112,8 @@ export async function payDrawing(
   store: Store,
   pay: (win: Win) => Promise<string>
 ) {
+  // Prizerail pays these winners itself. There is nothing for you to send.
+  if (drawing.payoutMode === "direct_winner") return true;
   let finished = true;
   for (const w of drawing.winners) {
     // Not in your wallet yet: a held prize, or a transfer still on its way.
@@ -174,7 +176,8 @@ Schedule it every few minutes. There are no webhooks, so the job polls.
 - **Never retry a `sending` row automatically.** If a run stops between inserting the row and saving its reference, or `pay` throws, the payment may or may not have gone out. Report those rows for a person to check, and alert on any that stay `sending` for more than a few minutes. Only when it is certain nothing was sent, delete the row so the next run pays it. A drawing with a `sending` row stays unfinished, so the job keeps reading it and pays that win once the row is gone. When paying onchain, sign the transaction and save its hash before broadcasting. A restart can then send the same signed transaction again, which can't pay twice.
 - **Run one copy of the job at a time,** or rely on the unique constraint as the lock, as the code above does.
 - **Amounts are in cents.** Transfers are USDC on Base, to the wallet in the transfer's `to`. One cent is 10,000 USDC base units.
-- **Guarantee draws are drawings with `kind` `"guarantee"`.** Don't filter them out. A guaranteed prize at or above the large-prize threshold arrives as one `large_prize` transfer, with no lump sum.
+- **Guarantee draws are drawings with `kind` `"guarantee"`.** Don't filter them out. They pay like any other draw: a guaranteed prize under the large-prize threshold arrives in a lump sum, and one at or above it arrives as one `large_prize` transfer, with no lump sum.
+- **Skip `direct_winner` drawings,** as `payDrawing` does. Prizerail pays those winners, and their transfers never carry a winner's slot, so without the skip the drawing would stay unfinished forever.
 - **Winner publicity is separate.** A winner with `publicity.required` true and a `publicity.url` has to share their win before Prizerail releases the prize. Showing them that link is in the `prizerail-integrate` skill. This job only pays once the transfer confirms.
 
 ## 6. Prove it works
