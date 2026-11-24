@@ -30,7 +30,7 @@ Then ask the developer anything the repo doesn't settle, in one message: how ent
 
 Rules that hold in both modes, and must be in the code and its comments:
 
-- **Entries land in the drawing whose cutoff is next** when they arrive. After a cutoff, they go to the following drawing. Totals never carry over between draws.
+- **Entries land in the drawing whose cutoff is next** when they arrive. After a cutoff, they go to the following drawing. Totals never carry over between scheduled draws. The guarantee draw is the exception: it adds up what each person had in every draw of the period, so send each draw only the entries earned for that draw, never a lifetime balance.
 - **The same person must have the same entrant id for the whole campaign.** The guarantee draw adds up each person's entries by their id across a period. Never rotate the key mid-campaign, and never make an id per draw, per session or per device.
 - **Only eligible users are sent.** Who can enter is below.
 - **Nothing personal is sent.** No emails, usernames, names or raw user ids as entrant ids. `displayName` and `avatarUrl` are optional and public if that entrant wins, so send them only if the partner wants them shown.
@@ -179,7 +179,7 @@ const found = await campaign.drawings.entrant(drawingId, entrantId)
 
 - `entered: false` is an answer, not an error: entries sent after the cutoff went to the next drawing, and ones that failed to send aren't anywhere. Check the next drawing and the sender's logs.
 - `winner` is `null` for everyone until `drawn` is true, so check `drawn` before reading a `null` winner as a loss. A `skipped` drawing (`drawing.status`) was never drawn, so there's no winner to wait for.
-- `position` is `null` until the drawing locks. In a guarantee draw (`drawing.kind` is `"guarantee"`) each person is listed once and `entries` is their total over the period, `position` is set from the start, and `receivedAt` is when the guarantee draw was made.
+- `position` is `null` until the drawing locks. In a guarantee draw (`drawing.kind` is `"guarantee"`) each person is listed once and `entries` is their total over the period, so it won't match any one draw's number, `position` is set from the start, and `receivedAt` is when the guarantee draw was made.
 - Plain HTTP: `GET {base}/campaigns/{slug}/drawings/{id}/entrant?entrantId=…`, URL-encoded, so a `+` goes as `%2B`. A bare `+` reads as a space, and the lookup finds no one.
 
 ## 10. When a winner must share their win
