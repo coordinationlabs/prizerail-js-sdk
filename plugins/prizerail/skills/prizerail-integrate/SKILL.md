@@ -30,7 +30,7 @@ Then ask the developer anything the repo doesn't settle, in one message: how ent
 
 Rules that hold in both modes, and must be in the code and its comments:
 
-- **Entries land in the drawing whose cutoff is next** when they arrive. After a cutoff, they go to the following drawing. Totals never carry over between scheduled draws. The guarantee draw is the exception: it adds up what each person had in every draw of the period, so send each draw only the entries earned for that draw, never a lifetime balance.
+- **Entries land in the drawing whose cutoff is next** when they arrive. After a cutoff, they go to the following drawing. Totals never carry over between scheduled draws. The guarantee draw is the exception: it adds up what each person had in every draw of the period, so whatever you send for a draw counts again there. An app that sends the same running balance every draw has it counted once per draw.
 - **The same person must have the same entrant id for the whole campaign.** The guarantee draw adds up each person's entries by their id across a period. Never rotate the key mid-campaign, and never make an id per draw, per session or per device.
 - **Only eligible users are sent.** Who can enter is below.
 - **Nothing personal is sent.** No emails, usernames, names or raw user ids as entrant ids. `displayName` and `avatarUrl` are optional and public if that entrant wins, so send them only if the partner wants them shown.
