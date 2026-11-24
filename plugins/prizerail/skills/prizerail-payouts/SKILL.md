@@ -44,7 +44,7 @@ Pay the winner only when that row's `status` is `confirmed`. A held prize reads 
 
 **One row per win,** with a unique constraint on the drawing's `id` and the winner's `position`. That pair is the key, because with repeat winners one person can fill several slots in a draw.
 
-**One row per drawing,** with whether every win in it has had its transfer confirmed. A held prize can be released days or weeks after its draw, when the drawing has long dropped off the first page of the list. The job reads every unfinished drawing again on each run, so that prize isn't missed.
+**One row per drawing,** with whether every win in it has been paid. A held prize can be released days or weeks after its draw, when the drawing has long dropped off the first page of the list. The job reads every unfinished drawing again on each run, so that prize isn't missed.
 
 ```sql
 create table prize_payments (
@@ -64,7 +64,7 @@ create table prize_drawings (
 );
 ```
 
-Use the project's own migration tool and naming. Insert the row as `sending` **before** paying. If the insert hits the unique constraint, the win is already handled, so skip it.
+Use the project's own migration tool and naming. Insert the row as `sending` **before** paying. If the insert hits the unique constraint, read the existing row's status and skip the win: `paid` is done, and `sending` is being paid by another run or is stuck.
 
 ## 4. The job
 
@@ -81,11 +81,14 @@ type Win = { drawingId: string; position: number; entrantId: string; amountCents
 
 /** Your database. */
 export type Store = {
-  /** Inserts the win as "sending", unique on (drawingId, position). False if it already exists. */
-  claim(win: Win): Promise<boolean>;
+  /**
+   * Inserts the win as "sending", unique on (drawingId, position), and returns
+   * "claimed". If the row already exists, returns its status instead.
+   */
+  claim(win: Win): Promise<"claimed" | "sending" | "paid">;
   /** Marks the win paid, with your transaction hash or credit id. */
   markPaid(win: Win, reference: string): Promise<void>;
-  /** Remembers a drawing, and whether every win in it has had its transfer confirmed. */
+  /** Remembers a drawing, and whether every win in it has been paid. */
   track(drawingId: string, finished: boolean): Promise<void>;
   /** The ids of tracked drawings that aren't finished. */
   unfinished(): Promise<string[]>;
@@ -102,7 +105,7 @@ export function transferFor(drawing: Drawing, position: number) {
 
 /**
  * Pays every win in a drawing whose money has reached your wallet. Safe to run
- * again. Returns true once every win's transfer has confirmed.
+ * again. Returns true once every win in it has been paid.
  */
 export async function payDrawing(
   drawing: Drawing,
@@ -123,12 +126,18 @@ export async function payDrawing(
       entrantId: w.winner,
       amountCents: w.amountCents,
     };
-    // Already paid, or being paid by another run.
-    if (!(await store.claim(win))) continue;
+    const state = await store.claim(win);
+    if (state === "paid") continue;
+    if (state === "sending") {
+      // Being paid by another run, or stuck. Never paid again automatically.
+      finished = false;
+      continue;
+    }
     try {
       await store.markPaid(win, await pay(win));
     } catch (err) {
       // The row stays "sending". Check whether it went out before paying it again.
+      finished = false;
       console.error(`Payment for ${win.drawingId}/${win.position} needs checking`, err);
     }
   }
@@ -142,7 +151,7 @@ export async function payWinners(store: Store, pay: (win: Win) => Promise<string
     const page = await campaign.drawings.list({ status, limit: 50 });
     for (const drawing of page.drawings) drawings.set(drawing.id, drawing);
   }
-  // An older drawing still waiting on a held prize: it has dropped off the lists above.
+  // An older drawing with a win still to pay: it has dropped off the lists above.
   for (const id of await store.unfinished()) {
     if (!drawings.has(id)) drawings.set(id, await campaign.drawings.get(id));
   }
@@ -162,7 +171,7 @@ Schedule it every few minutes. There are no webhooks, so the job polls.
 - **Read both `settled` and `paid` drawings.** A drawing stays `settled` until every transfer has confirmed, held prizes included. A job that waits for `paid` delays every other winner in a draw that has one held prize.
 - **Pay each winner their own `amountCents`.** Never divide the lump sum across all the winners. It carries only the prizes that aren't held.
 - **Decide from each transfer's `status`.** Never from the wallet's balance.
-- **Never retry a `sending` row automatically.** If a run stops between inserting the row and saving its reference, or `pay` throws, the payment may or may not have gone out. Report those rows for a person to check, and alert on any that stay `sending` for more than a few minutes. Only when it is certain nothing was sent, delete the row so the next run pays it. When paying onchain, sign the transaction and save its hash before broadcasting. A restart can then send the same signed transaction again, which can't pay twice.
+- **Never retry a `sending` row automatically.** If a run stops between inserting the row and saving its reference, or `pay` throws, the payment may or may not have gone out. Report those rows for a person to check, and alert on any that stay `sending` for more than a few minutes. Only when it is certain nothing was sent, delete the row so the next run pays it. A drawing with a `sending` row stays unfinished, so the job keeps reading it and pays that win once the row is gone. When paying onchain, sign the transaction and save its hash before broadcasting. A restart can then send the same signed transaction again, which can't pay twice.
 - **Run one copy of the job at a time,** or rely on the unique constraint as the lock, as the code above does.
 - **Amounts are in cents.** Transfers are USDC on Base, to the wallet in the transfer's `to`. One cent is 10,000 USDC base units.
 - **Guarantee draws are drawings with `kind` `"guarantee"`.** Don't filter them out. A guaranteed prize at or above the large-prize threshold arrives as one `large_prize` transfer, with no lump sum.
@@ -174,7 +183,8 @@ Schedule it every few minutes. There are no webhooks, so the job polls.
 2. Run the job. Every winner whose transfer is `confirmed` is paid once.
 3. Run the job again. It pays nobody.
 4. Write a test for `transferFor` with three drawings: one with only a lump sum, one with a lump sum and a `large_prize` row at `held_manual`, and one with only a `large_prize` row. The held winner must not be paid in the second and third until the row is `confirmed`.
-5. Write a test for a late release: a drawing with a held prize is tracked as unfinished, 60 newer drawings are paid, then the held row turns `confirmed`. The next run must pay that winner.
+5. Write a test for a failed payment: `pay` throws for one winner. The run must still pay the others, leave that row at `sending`, keep the drawing unfinished, never pay it again on its own, and pay it on the next run after the row is deleted.
+6. Write a test for a late release: a drawing with a held prize is tracked as unfinished, 60 newer drawings are paid, then the held row turns `confirmed`. The next run must pay that winner.
 
 Sandbox transfers aren't real money, so check the job against each transfer's `status`, not the wallet.
 
