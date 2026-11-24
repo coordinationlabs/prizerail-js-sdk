@@ -193,8 +193,8 @@ export type EntrantLookup = {
   /** Whether the drawing holds entries for this id. */
   entered: boolean;
   /**
-   * Their number of entries, or null if they didn't enter. 1 in a guarantee
-   * draw, which gives everyone who entered the period one entry.
+   * Their number of entries, or null if they didn't enter. In a guarantee
+   * draw, their total from every draw in the period.
    */
   entries: number | null;
   /**
