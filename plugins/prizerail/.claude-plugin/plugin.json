@@ -1,7 +1,7 @@
 {
   "name": "prizerail",
-  "version": "1.4.2",
-  "description": "Integrate Prizerail prize draws into an app, check an integration end to end, and look up or verify draws.",
+  "version": "1.5.0",
+  "description": "Integrate Prizerail prize draws into an app, check an integration end to end, pay winners, and look up or verify draws.",
   "author": {
     "name": "Prizerail",
     "email": "team@coordinationlabs.com",
